@@ -38,7 +38,7 @@ h1,h2,h3{color:#71433e;letter-spacing:-.025em}
 div.stButton>button{border-radius:20px;min-height:3.25rem;height:auto;white-space:normal;background:#fffefa;color:#6b4943;border:1px solid #f1cfc5;padding:12px 14px}
 div.stButton>button:hover{background:#fff0e9;border-color:#e79e9e;color:#70423b}
 div.stButton>button[kind="primary"]{background:#e68f9b;color:white;border-color:#e68f9b}
-.oven-title{text-align:center;color:#743e36;font-size:2.8rem;font-weight:850;line-height:1.2}
+.oven-title{text-align:center;color:#743e36;font-size:clamp(1.55rem,4vw,2.8rem);font-weight:850;line-height:1.35;overflow-wrap:break-word;padding:0 8px}
 .oven-tag{text-align:center;color:#ad6d69;font-size:1.08rem;margin:5px 0 15px}
 .crumb{background:#fffaf6;border:1px solid #f3d8d2;border-radius:25px;padding:12px 16px;margin:12px 0;color:#94665c;text-align:center}
 .soft-card{background:#fffaf7;border:1px solid #f4d8cf;border-radius:25px;padding:18px;margin:10px 0}
@@ -307,10 +307,11 @@ def html_book():
     return ("<!doctype html><html lang='ko'><meta charset='utf-8'><title>"+title+"</title><style>body{background:#f9eee9;font-family:serif;color:#624d42;max-width:750px;margin:30px auto;padding:15px}.cover,.page{background:#fffdf5;padding:32px;border-radius:15px;box-shadow:0 4px 15px #ad9b8940;margin:25px 0;text-align:center;page-break-after:always}.cover{padding:100px 20px;background:#fce4da}h1{font-size:2.7em}.page img{width:100%;border-radius:14px}.page p{text-align:left;line-height:2.1;font-size:1.2em;white-space:pre-wrap}.page small{color:#b2a096}@media print{body{background:white}.page,.cover{box-shadow:none}}</style><div class='cover'><h3>🍡 말랑말랑 스토리 오븐</h3><h1>"+title+"</h1><p>내가 구운 세상에 하나뿐인 이야기</p></div>"+"".join(sections)+"</html>")
 
 # masthead / stretching mascot
-st.markdown('<div class="oven-title">🍡 말랑말랑 스토리 오븐</div><div class="oven-tag">내 마음속 이야기를 맛있게 구워볼까요?</div>',unsafe_allow_html=True)
+if ss.stage != 0:
+    st.markdown('<div class="oven-title">🍡 말랑말랑 스토리 오븐</div><div class="oven-tag">내 마음속 이야기를 맛있게 구워볼까요?</div>',unsafe_allow_html=True)
 if ss.stage == 0 and (BASE / "story_oven.png").exists():
-    a,b,c=st.columns([1,1.3,1])
-    with b: st.image(str(BASE/"story_oven.png"),use_container_width=True)
+    a,b,c=st.columns([1,2.5,1])
+    with b: st.image(str(BASE/"story_oven_banner.png"),use_container_width=True)
 elif (BASE / "marshmallow_mascot.png").exists():
     stretch = 1.0 + min(ss.stage,5)*0.11 + min(len(ss.events),3)*0.06
     uri=image_b64(BASE/"marshmallow_mascot.png")
@@ -321,7 +322,7 @@ st.progress(ss.stage/6)
 st.markdown(f'<div class="crumb">{ss.stage+1} / 7 · {steps[ss.stage]}</div>',unsafe_allow_html=True)
 
 if ss.stage == 0:
-    st.subheader("🥣 어떤 이야기를 구워볼까?")
+    st.subheader("🥣 나만의 이야기 재료를 골라봐!")
     st.text_input("이야기 소재",key="topic",placeholder="예: 바다, 공룡, 학교, 우주")
     st.markdown("#### 소스를 골라 줘!")
     cols=st.columns(3)
@@ -344,7 +345,7 @@ if ss.stage == 0:
             except Exception as e:
                 st.error(f"{type(e).__name__} · HTTP {getattr(e,'code','—')}")
                 st.caption("모델 권한, 사용량 및 API 키 설정을 확인해 주세요. API 키는 공유하지 마세요.")
-    if st.button("🍪 이야기 재료 고르기",type="primary",use_container_width=True,disabled=not ss.topic.strip()): go(1)
+    if st.button("🍡 이야기 구워보기 →",type="primary",use_container_width=True,disabled=not ss.topic.strip()): go(1)
 
 elif ss.stage == 1:
     st.subheader("🍪 어떤 장르로 구워볼까?")
