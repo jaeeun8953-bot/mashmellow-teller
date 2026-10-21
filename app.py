@@ -48,6 +48,29 @@ div.stButton>button[kind="primary"]{background:#e68f9b;color:white;border-color:
 .book-page p{font-size:1.07rem;white-space:pre-wrap}
 .page-no{text-align:center;color:#a88c78;font-size:.8rem;margin-top:12px}
 .mascot-label{text-align:center;color:#aa6b69;font-size:.87rem;font-weight:650}
+/* Twisted pastel marshmallow inspired by the user's spiral candy reference. */
+.marsh-scene{position:relative;margin:14px 4px 6px;padding:15px 12px 5px;min-height:158px;background:radial-gradient(ellipse at 50% 68%,#ffe8e4 0%,#fff7f0 65%,transparent 78%);border-radius:26px}
+.marsh-runway{position:relative;width:100%;height:118px;overflow:visible}
+.marsh-body{position:absolute;left:0;top:12px;height:78px;min-width:108px;box-sizing:border-box;border:3px solid #fff9f8;border-radius:44% 33% 40% 32% / 47% 43% 52% 48%;background:repeating-linear-gradient(122deg,#fffdfb 0px,#fffdfb 20px,#f9d6f4 22px,#f9d6f4 43px,#fff6bb 45px,#fff6bb 65px,#bce9fc 67px,#bce9fc 88px,#fffdfb 90px,#fffdfb 108px);background-size:220px 180px;box-shadow:inset 0 9px 12px #ffffffc9,inset 0 -11px 15px #cfb5d063,0 10px 14px #b7899452;transition:width .75s cubic-bezier(.22,.8,.26,1);animation:marsh-squish .8s ease both;isolation:isolate}
+.marsh-body:before{content:"";position:absolute;inset:7px 9px;border-radius:inherit;background:repeating-linear-gradient(122deg,transparent 0px,transparent 33px,#ffffff52 36px,#ffffff10 52px,transparent 69px);filter:blur(3px);pointer-events:none}
+.marsh-body:after{content:"";position:absolute;left:8px;right:8px;top:5px;height:14px;border-radius:50%;background:#ffffff88;filter:blur(6px);pointer-events:none}
+.marsh-features{position:absolute;right:12px;top:21px;width:56px;height:32px;z-index:2;background:#ffffffad;border-radius:45%;box-shadow:0 0 12px 9px #ffffff8c}
+.marsh-eye{position:absolute;top:3px;width:6px;height:12px;background:#3c2926;border-radius:50%}
+.marsh-eye.left{left:15px}.marsh-eye.right{right:15px}
+.marsh-blush{position:absolute;top:17px;width:10px;height:6px;background:#ed8694;border-radius:50%}
+.marsh-blush.left{left:2px}.marsh-blush.right{right:2px}
+.marsh-mouth{position:absolute;top:15px;left:24px;width:12px;height:8px;border-bottom:2px solid #3c2926;border-radius:0 0 50% 50%}
+.marsh-arm{position:absolute;top:52px;width:16px;height:19px;border-bottom:3px solid #51302a;z-index:-1}
+.marsh-arm.left{left:-11px;transform:rotate(-30deg);border-left:3px solid #51302a;border-radius:0 0 0 90%}
+.marsh-arm.right{right:-11px;transform:rotate(30deg);border-right:3px solid #51302a;border-radius:0 0 90% 0}
+.marsh-foot{position:absolute;bottom:-17px;width:18px;height:21px;border-left:3px solid #51302a;border-bottom:3px solid #51302a;border-radius:0 0 45% 30%}
+.marsh-foot.left{left:26px;transform:rotate(7deg)}.marsh-foot.right{right:26px;transform:rotate(-7deg)}
+.marsh-sparkle{position:absolute;right:0;top:0;color:#e8a54b;font-size:22px;animation:twinkle 1.8s ease-in-out infinite}
+.marsh-caption{text-align:center;color:#9b6a65;font-size:.91rem;font-weight:650;margin:5px 0 12px}
+@keyframes marsh-squish{0%{transform:scaleY(.85) skewX(-3deg)}55%{transform:scaleY(1.08) skewX(2deg)}100%{transform:scaleY(1) skewX(0)}}
+@keyframes twinkle{50%{opacity:.45;transform:scale(.8)}}
+@media(max-width:520px){.marsh-scene{min-height:140px}.marsh-runway{height:105px}.marsh-body{height:70px}.marsh-features{right:7px;top:17px}}
+@media(prefers-reduced-motion:reduce){.marsh-body,.marsh-sparkle{animation:none;transition:none}}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -353,12 +376,21 @@ if ss.stage == -1:
     st.stop()
 
 st.markdown(f'<div class="oven-title">🍡 {tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</div><div class="oven-tag">{tr("내 마음속 이야기를 맛있게 구워볼까요?", "Let's bake the story in your imagination!")}</div>', unsafe_allow_html=True)
-if (BASE / "marshmallow_mascot.png").exists():
-    stretch = 1.0 + min(ss.stage, 5) * 0.11 + min(len(ss.events), 3) * 0.06
-    uri = image_b64(BASE / "marshmallow_mascot.png")
-    st.markdown(f'<div style="height:{int(125*stretch)}px;display:flex;align-items:center;justify-content:center;overflow:visible"><img src="data:image/png;base64,{uri}" style="height:105px;transform:scaleY({stretch});transform-origin:bottom center;transition:transform .5s ease"></div><div class="mascot-label">{tr("이야기가 자랄수록 마시멜로도 쭈욱~!", "Your marshmallow stretches as your story grows!")}</div>',unsafe_allow_html=True)
 steps = (["소재와 소스", "장르 고르기", "주인공 고르기", "장소 고르기", "사건 만들기", "결말 쓰기", "동화책 완성"] if ss.lang == "한국어" else ["Topic & sauce", "Pick a genre", "Choose a hero", "Choose a place", "Story events", "Write an ending", "Your storybook"])
-st.progress(ss.stage/6)
+# A pastel twisted marshmallow grows as the child makes story choices.
+# Event choices count as small extra growth within the event stage.
+progress_fraction = min(1.0, (ss.stage + min(len(ss.events), 3) * (0.18 if ss.stage == 4 else 0)) / 6)
+progress_width = round(18 + 80 * progress_fraction, 1)
+progress_label = tr("마시멜로가 쭈욱~ 이야기가 자라고 있어요!", "Squish! Your marshmallow grows with your story!")
+st.markdown(f'''<div class="marsh-scene" role="progressbar" aria-label="Story progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{round(progress_fraction*100)}">
+ <div class="marsh-runway">
+  <div class="marsh-body" style="width:{progress_width}%">
+   <span class="marsh-arm left"></span><span class="marsh-arm right"></span>
+   <span class="marsh-foot left"></span><span class="marsh-foot right"></span>
+   <div class="marsh-features"><span class="marsh-eye left"></span><span class="marsh-eye right"></span><span class="marsh-blush left"></span><span class="marsh-blush right"></span><span class="marsh-mouth"></span></div>
+  </div><span class="marsh-sparkle">✦</span>
+ </div>
+</div><div class="marsh-caption">{progress_label}</div>''', unsafe_allow_html=True)
 st.markdown(f'<div class="crumb">{ss.stage+1} / 7 · {steps[ss.stage]}</div>',unsafe_allow_html=True)
 
 if ss.stage == 0:
