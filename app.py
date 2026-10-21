@@ -45,7 +45,7 @@ div.stButton>button[kind="primary"]{background:#e68f9b;color:white;border-color:
 .book-cover{background:linear-gradient(155deg,#ffd8c5,#fff4db,#f9dbea);border:9px double #f8fff9;border-radius:22px;min-height:340px;padding:40px 25px;text-align:center;box-shadow:10px 12px 20px #b7838040}
 .book-cover h1{font-family:Georgia,serif;font-size:2.7rem;margin:30px 0;color:#714139}
 .story-paper{position:relative;isolation:isolate;overflow:hidden;background:#fffaf0;border:1px solid #e7cdb6;border-radius:17px;padding:clamp(24px,6vw,62px);box-shadow:0 8px 24px #ad8a7052;line-height:2.15;color:#59493f}
-.story-paper::before{content:"";position:absolute;inset:0;z-index:-1;background-image:linear-gradient(180deg,rgba(255,251,239,.73) 0%,rgba(255,251,239,.88) 30%,rgba(255,251,239,.94) 65%,rgba(255,251,239,.97) 100%),var(--story-art);background-size:cover,100% auto;background-position:center,center top;background-repeat:no-repeat;opacity:1}
+.story-paper::before{content:"";position:absolute;inset:0;z-index:-1;background-image:linear-gradient(180deg,rgba(255,251,239,.72) 0%,rgba(255,251,239,.86) 35%,rgba(255,251,239,.96) 100%),var(--story-art);background-size:cover,100% auto;background-position:center,center top;background-repeat:no-repeat;opacity:1}
 .story-paper::after{content:"✦  ✧  ✦";display:block;text-align:center;color:#c9a58b;letter-spacing:1.2rem;margin-top:20px}
 .story-paper h2{font-family:Georgia,"Noto Serif KR",serif;text-align:center;font-size:clamp(1.5rem,4vw,2.3rem);margin:0 0 8px;color:#704b41}
 .story-paper .story-brand{text-align:center;color:#9b7c70;font-size:.84rem;margin-bottom:22px;letter-spacing:.04em}
@@ -72,7 +72,7 @@ st.markdown(CSS, unsafe_allow_html=True)
 
 
 def initialize():
-    defaults = dict(stage=-1, lang="한국어", topic="", sauce="바닐라 🍦", genre="", hero="", place="", events=[], ending="", title="", options=[], notice="", story=None, ai_model="", ai_error="")
+    defaults = dict(stage=-1, lang="한국어", topic="", sauce="바닐라 🍦", genre="", hero="", place="", events=[], ending="", title="", options=[], notice="", story=None, ai_model="", ai_error="", continuation_start=0, previous_story_text="", continuation_count=0)
     for key, value in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = value.copy() if isinstance(value, (list, dict)) else value
@@ -176,7 +176,7 @@ def parse_json(raw):
 
 
 def context():
-    return dict(topic=ss.topic, sauce=ss.sauce, sauce_rule=SAUCES[ss.sauce], genre=ss.genre, genre_rule=GENRES.get(ss.genre, ""), hero=ss.hero, place=ss.place, selected_events=ss.events)
+    return dict(topic=ss.topic, sauce=ss.sauce, sauce_rule=SAUCES[ss.sauce], genre=ss.genre, genre_rule=GENRES.get(ss.genre, ""), hero=ss.hero, place=ss.place, selected_events=ss.events, previous_story=getattr(ss,"previous_story_text",""))
 
 
 def fallback_options(kind):
@@ -244,6 +244,9 @@ def story_fallback():
 
 def finish_story():
     prompt = f"""당신은 8~10세 아이가 직접 선택한 소재와 사건으로 그림책을 편집하는 어린이 동화 작가입니다.
+이미 완성한 이야기가 있으면 그 이야기를 처음부터 다시 쓰지 말고 바로 다음 사건으로 이어지는 후속편을 작성하세요.
+후속편에서는 기존 등장인물과 장소를 유지하고, 이전 결말에서 자연스럽게 출발하세요.
+이번 후속편에서 새로 선택한 사건: {json.dumps(ss.events[ss.continuation_start:],ensure_ascii=False)}.
 아이의 선택이 전체 줄거리의 원인과 결과에 반드시 반영되어야 합니다. 전체 4~6개의 짧은 페이지, 페이지당 2~4문장, 쉽고 생생한 한국어.
 초코는 현실적이고 탄탄한 개연성, 딸기는 부드럽고 창의적인 판타지, 바닐라는 혼합형.
 장르의 분위기를 지키되 아동 친화적이고 과도한 공포나 폭력은 금지.
@@ -272,87 +275,134 @@ def go(stage):
     st.rerun()
 
 
-def draw_scene(page_number):
-    """Locally drawn context-sensitive storybook scene; no image API required."""
-    W, H = 1000, 520
-    im = Image.new("RGB", (W, H), (255, 241, 223))
-    d = ImageDraw.Draw(im)
-    sea = any(x in ss.place + ss.topic for x in ("바다", "해변", "해안", "섬", "호수"))
-    forest = any(x in ss.place + ss.topic for x in ("숲", "나무", "산", "정글"))
-    castle = any(x in ss.place for x in ("성", "궁", "탑"))
+def draw_scene(page_number=0):
+    """Draw one decorative illustration reflecting the actual story and selected setting.
+
+    This is procedural art, not an AI-generated picture; it deliberately avoids
+    reusing the same generic cookie character/castle in unrelated stories.
+    """
+    W,H=1100,610
+    story=ss.story or {}
+    full=" ".join([ss.topic,ss.hero,ss.place,ss.genre, *ss.events,
+                   str(story.get("title","")), *story.get("pages",[]) ]).lower()
+    def has(*words):return any(w in full for w in words)
+    if has("바다","해변","파도","섬","ocean","sea","beach","pirate"):
+        theme="sea"
+    elif has("우주","별","달","행성","로켓","space","moon","planet","star"):
+        theme="space"
+    elif has("숲","나무","정글","forest","woods","tree"):
+        theme="forest"
+    elif has("학교","교실","도서관","school","library","classroom"):
+        theme="school"
+    elif has("눈","겨울","얼음","snow","winter","ice"):
+        theme="snow"
+    elif has("성","궁전","castle","palace"):
+        theme="castle"
+    elif has("사막","모래","desert"):
+        theme="desert"
+    else:
+        theme="meadow"
+    palettes={
+      "sea":((216,244,250),(246,252,242)),"space":((219,218,247),(252,237,248)),
+      "forest":((226,244,222),(253,246,226)),"school":((255,235,221),(252,248,233)),
+      "snow":((229,245,252),(253,250,252)),"castle":((247,221,234),(253,246,228)),
+      "desert":((255,233,204),(255,249,229)),"meadow":((252,232,229),(253,249,225))}
+    top,bottom=palettes[theme]
+    im=Image.new("RGB",(W,H));d=ImageDraw.Draw(im)
     for y in range(H):
-        f = y / H
-        if ss.sauce.startswith("초코"):
-            top, bottom = (255, 227, 201), (247, 238, 224)
-        elif ss.sauce.startswith("딸기"):
-            top, bottom = (255, 213, 226), (241, 229, 255)
-        else:
-            top, bottom = (254, 224, 218), (233, 232, 255)
-        c = tuple(int(top[i] * (1-f) + bottom[i]*f) for i in range(3))
-        d.line((0,y,W,y), fill=c)
-    # sky details
-    d.ellipse((720,50,840,170), fill=(255,246,194))
-    for x,y in [(125,95),(380,125),(590,55),(885,110)]:
-        d.ellipse((x-45,y,x+45,y+30), fill=(255,250,246))
-        d.ellipse((x-15,y-22,x+45,y+25), fill=(255,250,246))
-    if sea:
-        d.rectangle((0,310,W,H), fill=(122,192,207))
-        for y in (340,385,430,475):
-            for x in range(0,W,175):
-                d.arc((x+page_number*23%90,y,x+100+page_number*23%90,y+18),0,160,fill=(232,249,247),width=5)
-        d.polygon([(0,460),(180,380),(350,520),(0,520)],fill=(244,213,159))
-    elif forest:
-        d.rectangle((0,410,W,H),fill=(162,197,151))
-        for x,h in [(80,210),(240,290),(680,270),(860,220)]:
-            d.rectangle((x-14,420-h//2,x+14,440),fill=(143,100,83))
-            d.ellipse((x-75,320-h,x+75,440-h//2),fill=(110,165,129))
-            d.ellipse((x-50,275-h,x+55,385-h//2),fill=(133,186,144))
+        t=y/H;d.line((0,y,W,y),fill=tuple(int(top[i]*(1-t)+bottom[i]*t) for i in range(3)))
+    # Gentle decorative sun, clouds and sparkles.
+    d.ellipse((850,66,990,206),fill=(255,248,200))
+    for x,y in ((140,130),(390,85),(620,158)):
+        d.ellipse((x,y,x+118,y+37),fill=(255,252,250))
+        d.ellipse((x+30,y-27,x+100,y+32),fill=(255,252,250))
+    if theme=="sea":
+        d.rectangle((0,335,W,H),fill=(149,210,218))
+        for y in (365,415,475,530):
+            for x in range(30,W,160):d.arc((x,y,x+105,y+30),0,165,fill=(237,253,248),width=6)
+        d.polygon(((0,475),(240,400),(395,610),(0,610)),fill=(245,223,174))
+        d.polygon(((685,400),(770,300),(825,400)),fill=(255,247,229))
+        d.line((770,290,770,495),fill=(161,116,90),width=11)
+        d.arc((630,430,900,555),0,180,fill=(143,100,83),width=12)
+    elif theme=="space":
+        for x,y,r in ((135,310,45),(520,380,72),(890,345,55)):
+            d.ellipse((x-r,y-r,x+r,y+r),fill=(193,178,228),outline=(255,250,242),width=5)
+        for x,y in ((100,260),(360,320),(720,260),(980,260)):
+            d.line((x-11,y,x+11,y),fill=(255,255,249),width=5)
+            d.line((x,y-11,x,y+11),fill=(255,255,249),width=5)
+        d.polygon(((450,550),(510,390),(570,550)),fill=(237,157,163))
+        d.ellipse((488,455,532,499),fill=(209,236,249))
+    elif theme=="forest":
+        d.polygon(((0,445),(240,355),(480,440),(760,340),(1100,440),(1100,610),(0,610)),fill=(166,204,161))
+        for x,h in ((90,250),(250,190),(510,265),(740,225),(950,250)):
+            d.rectangle((x-16,530-h//3,x+16,550),fill=(157,119,95))
+            d.ellipse((x-92,395-h,x+92,535-h//2),fill=(119,174,133))
+            d.ellipse((x-65,350-h,x+67,490-h//2),fill=(154,196,147))
+    elif theme=="school":
+        d.rectangle((0,485,W,H),fill=(217,198,168))
+        d.rounded_rectangle((255,225,855,520),radius=18,fill=(248,218,197),outline=(195,155,142),width=7)
+        d.polygon(((210,235),(555,95),(900,235)),fill=(199,142,139))
+        for x in (330,690):d.rectangle((x,290,x+115,400),fill=(196,224,231),outline=(160,139,136),width=6)
+        d.rectangle((525,370,600,520),fill=(168,121,107))
+    elif theme=="snow":
+        d.polygon(((0,430),(245,310),(470,450),(720,300),(1100,430),(1100,610),(0,610)),fill=(243,250,250))
+        for x,y in ((190,370),(490,300),(740,410),(900,270)):
+            for dx,dy in ((-14,0),(14,0),(0,-14),(0,14)):
+                d.line((x,y,x+dx,y+dy),fill=(171,205,221),width=4)
+        d.ellipse((485,375,625,515),fill=(255,255,254),outline=(198,222,227),width=4)
+        d.ellipse((510,300,600,390),fill=(255,255,254),outline=(198,222,227),width=4)
+    elif theme=="castle":
+        d.polygon(((0,470),(280,380),(520,470),(760,380),(1100,470),(1100,610),(0,610)),fill=(186,207,170))
+        d.rectangle((330,280,790,520),fill=(239,203,197))
+        for x in (350,690):
+            d.rectangle((x,180,x+95,520),fill=(214,177,194))
+            d.polygon(((x-20,185),(x+48,110),(x+115,185)),fill=(151,122,169))
+        d.arc((520,410,600,570),180,360,fill=(155,111,109),width=13)
+    elif theme=="desert":
+        d.ellipse((0,390,710,790),fill=(248,213,162))
+        d.ellipse((480,420,1270,900),fill=(234,188,146))
+        for x in (350,800):
+            d.line((x,455,x,345),fill=(131,176,131),width=22)
+            d.arc((x-50,335,x+20,415),0,110,fill=(131,176,131),width=16)
     else:
-        d.polygon([(0,385),(230,305),(470,390),(700,320),(1000,370),(1000,520),(0,520)],fill=(191,205,170))
-        d.rectangle((0,445,W,H),fill=(163,198,156))
-        if castle:
-            d.rectangle((600,220,850,445),fill=(240,205,194))
-            for x in (620,790):
-                d.rectangle((x,160,x+45,350),fill=(220,176,173))
-                d.polygon([(x-10,160),(x+22,110),(x+55,160)],fill=(152,112,155))
-        else:
-            d.rectangle((620,285,850,440),fill=(249,220,196))
-            d.polygon([(585,285),(735,180),(885,285)],fill=(194,130,123))
-            d.rectangle((710,350,758,440),fill=(165,121,102))
-    # illustrated main character cookie silhouette
-    cx = 350 + (page_number%3)*55
-    cy = 335
-    d.ellipse((cx-82,cy-92,cx+82,cy+74),fill=(233,179,132),outline=(166,116,92),width=5)
-    d.ellipse((cx-67,cy-135,cx-15,cy-74),fill=(233,179,132),outline=(166,116,92),width=4)
-    d.ellipse((cx+15,cy-135,cx+67,cy-74),fill=(233,179,132),outline=(166,116,92),width=4)
-    d.ellipse((cx-33,cy-22,cx-19,cy-7),fill=(79,57,52))
-    d.ellipse((cx+19,cy-22,cx+33,cy-7),fill=(79,57,52))
-    d.arc((cx-20,cy-2,cx+20,cy+30),0,180,fill=(95,62,57),width=4)
-    d.ellipse((cx-53,cy+2,cx-32,cy+18),fill=(235,140,147))
-    d.ellipse((cx+32,cy+2,cx+53,cy+18),fill=(235,140,147))
-    # narrative symbols depend on the chosen event and topic
-    event = ss.events[min(max(page_number-1,0),len(ss.events)-1)] if ss.events else ss.topic
-    if any(x in event for x in ("편지","소식","지도")):
-        d.rounded_rectangle((610,300,750,395),radius=10,fill=(255,247,219),outline=(178,130,113),width=4)
-        d.line((610,300,680,355,750,300),fill=(178,130,113),width=3)
-    elif any(x in event for x in ("비밀","단서","발견","수수께끼")):
-        d.rounded_rectangle((625,330,755,420),radius=12,fill=(173,119,84),outline=(108,78,67),width=5)
-        d.rectangle((625,348,755,365),fill=(248,216,119))
-        d.ellipse((678,354,703,382),fill=(255,247,195))
+        d.polygon(((0,440),(220,340),(470,445),(720,355),(1100,445),(1100,610),(0,610)),fill=(184,207,171))
+        for x,y in ((190,455),(500,475),(860,450)):
+            d.line((x,y,x,y-90),fill=(140,172,125),width=9)
+            for dx,dy in ((-30,-110),(30,-105),(0,-135)):
+                d.ellipse((x+dx-25,y+dy-25,x+dx+25,y+dy+25),fill=(239,167,183))
+    # Story-specific motifs, not the same default animal on every story.
+    if has("고양이","cat","kitten"):
+        d.ellipse((125,375,265,515),fill=(241,194,151));d.polygon(((140,398),(150,340),(185,378)),fill=(241,194,151));d.polygon(((205,378),(245,340),(250,405)),fill=(241,194,151))
+        d.ellipse((164,434,175,447),fill=(89,69,64));d.ellipse((216,434,227,447),fill=(89,69,64))
+    elif has("토끼","rabbit","bunny"):
+        d.ellipse((130,385,280,525),fill=(255,249,241))
+        d.ellipse((155,300,190,420),fill=(255,249,241));d.ellipse((218,300,253,420),fill=(255,249,241))
+        d.ellipse((176,445,188,458),fill=(95,73,73));d.ellipse((222,445,234,458),fill=(95,73,73))
+    elif has("곰","bear"):
+        d.ellipse((130,380,275,525),fill=(224,174,133))
+        d.ellipse((135,365,178,408),fill=(224,174,133));d.ellipse((227,365,270,408),fill=(224,174,133))
+    elif has("공룡","dinosaur"):
+        d.ellipse((135,385,320,540),fill=(147,198,161));d.polygon(((170,400),(195,340),(220,398)),fill=(147,198,161))
+    # Event-specific motifs for clues, letters, keys and friendship.
+    if has("편지","letter","mail"):
+        d.rounded_rectangle((710,400,860,505),radius=12,fill=(255,251,234),outline=(190,142,121),width=5)
+        d.line((710,400,785,460,860,400),fill=(190,142,121),width=4)
+    elif has("열쇠","key"):
+        d.ellipse((760,395,825,460),outline=(204,154,83),width=13)
+        d.line((817,446,875,500),fill=(204,154,83),width=13)
+    elif has("보물","treasure","상자","chest"):
+        d.rounded_rectangle((735,410,900,520),radius=16,fill=(174,121,90),outline=(115,83,71),width=6)
+        d.rectangle((735,445,900,463),fill=(248,216,122))
     else:
-        for x,y in [(650,310),(745,355),(830,285)]:
-            d.ellipse((x,y,x+22,y+22),fill=(255,236,139))
-            d.line((x+11,y-12,x+11,y+34),fill=(255,250,215),width=3)
-    b=io.BytesIO()
-    im.save(b,format="PNG")
-    return b.getvalue()
+        for x,y in ((650,330),(780,365),(910,315)):
+            d.ellipse((x,y,x+15,y+15),fill=(255,232,143))
+    b=io.BytesIO();im.save(b,format="PNG");return b.getvalue()
 
 
 def html_book():
     title = html.escape(ss.story["title"])
     paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
     picture = base64.b64encode(draw_scene(0)).decode("ascii")
-    brand = tr("말랑말랑 스토리 오븐", "Squishy Story Oven")
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>
     <style>body{{background:#f9eee9;color:#59493f;font-family:Georgia,serif;max-width:800px;margin:25px auto;padding:15px}}
     article{{background:#fffaf0;border:1px solid #e7cdb6;border-radius:18px;padding:clamp(24px,6vw,62px);
@@ -361,7 +411,7 @@ def html_book():
     h1,h3{{text-align:center}}h1{{font-size:2.2em;color:#704b41}}h3{{color:#9b7c70}}
     p{{line-height:2.2;font-size:1.13em;white-space:pre-wrap;margin:1.2em 0;overflow-wrap:anywhere}}
     @media print{{body{{background:white;margin:0}}article{{box-shadow:none}}}}</style></head>
-    <body><article><h3>🍡 {brand}</h3><h1>{title}</h1>{paragraphs}</article></body></html>"""
+    <body><article><h1>{title}</h1>{paragraphs}</article></body></html>"""
 
 # The language control is placed in normal document flow, not near the cropped top edge.
 def language_picker():
@@ -378,7 +428,8 @@ if ss.stage == -1:
     st.stop()
 
 skewer_data = base64.b64encode((BASE / "pastel_marshmallow_skewer.png").read_bytes()).decode("ascii")
-st.markdown(f'<div class="oven-title"><img alt="Pastel marshmallow skewer" style="height:68px;width:68px;object-fit:contain;vertical-align:middle;margin-right:8px" src="data:image/png;base64,{skewer_data}"/> {tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</div><div class="oven-tag">{tr("내 마음속 이야기를 맛있게 구워볼까요?", "Let\'s bake the story in your imagination!")}</div>', unsafe_allow_html=True)
+if ss.stage != 6:
+    st.markdown(f'<div class="oven-title"><img alt="Pastel marshmallow skewer" style="height:68px;width:68px;object-fit:contain;vertical-align:middle;margin-right:8px" src="data:image/png;base64,{skewer_data}"/> {tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</div><div class="oven-tag">{tr("내 마음속 이야기를 맛있게 구워볼까요?", "Let\'s bake the story in your imagination!")}</div>', unsafe_allow_html=True)
 language_picker()
 steps = (["소재와 소스", "장르 고르기", "주인공 고르기", "장소 고르기", "사건 만들기", "결말 쓰기", "동화책 완성"] if ss.lang == "한국어" else ["Topic & sauce", "Pick a genre", "Choose a hero", "Choose a place", "Story events", "Write an ending", "Your storybook"])
 # A pastel twisted marshmallow grows as the child makes story choices.
@@ -451,6 +502,7 @@ elif ss.stage == 3:
         if st.button(opt,key=f"place_{i}",use_container_width=True):
             ss.place=opt
             ss.events=[]
+            ss.continuation_start=0
             ss.options=options_for("event")
             go(4)
     if st.button(tr("← 주인공 다시 고르기", "← Change hero")):
@@ -467,10 +519,10 @@ elif ss.stage == 4:
     for i,opt in enumerate(ss.options):
         if st.button("☁️ "+opt,key=f"event_{len(ss.events)}_{i}",use_container_width=True):
             ss.events.append(opt)
-            if len(ss.events)>=3:go(5)
+            if len(ss.events)-ss.continuation_start>=3:go(5)
             ss.options=options_for("event")
             st.rerun()
-    if ss.events and st.button(tr("✏️ 이제 결말을 쓸래!", "✏️ I want to write the ending!"),type="primary",use_container_width=True):go(5)
+    if len(ss.events)>ss.continuation_start and st.button(tr("✏️ 이제 결말을 쓸래!", "✏️ I want to write the ending!"),type="primary",use_container_width=True):go(5)
     if st.button(tr("← 장소 다시 고르기", "← Change place")):
         ss.options=options_for("place")
         go(3)
@@ -496,17 +548,31 @@ elif ss.stage == 6:
     title=ss.story["title"]
     picture = base64.b64encode(draw_scene(0)).decode("ascii")
     paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
-    brand = tr("말랑말랑 스토리 오븐", "Squishy Story Oven")
     paper = (f'<article class="story-paper" style="--story-art:url(data:image/png;base64,{picture})">'
-             f'<div class="story-brand">🍡 {brand}</div><h2>{html.escape(title)}</h2>'
-             f'{paragraphs}</article>')
+             f'<h2>{html.escape(title)}</h2>{paragraphs}</article>')
     st.markdown(paper, unsafe_allow_html=True)
     st.caption(tr(ss.story.get("ending_note",""), "The ending has been polished to fit the story."))
     with st.expander(tr("✏️ 내가 처음 쓴 결말 보기", "✏️ See my original ending")):
         st.write(ss.ending)
     st.download_button(tr("📥 한 페이지 동화 다운로드 (.html)", "📥 Download one-page story (.html)"),data=html_book().encode("utf-8"),file_name=f"marshmallow_story_{datetime.now():%Y%m%d}.html",mime="text/html",use_container_width=True)
-    st.caption(tr("HTML 파일을 브라우저로 열어 인쇄 → PDF로 저장할 수도 있어요. 그림은 선택한 배경·사건을 바탕으로 앱이 직접 그린 삽화예요.", "Open the HTML in a browser and use Print → Save as PDF. Illustrations are generated locally from your choices."))
-    if st.button(tr("🍡 새 이야기 굽기", "🍡 Bake another story"),type="primary",use_container_width=True):
-        for key in ("stage","topic","sauce","genre","hero","place","events","ending","title","options","notice","story","ai_model","ai_error"):
-            ss.pop(key,None)
-        st.rerun()
+    st.caption(tr("삽화는 이야기 속 장소·등장인물·사건에 맞춰 그린 장식 그림이에요. AI가 장면 전체를 직접 그리는 방식은 아니에요.", "The decorative illustration responds to your story setting and events; it is not a full AI-rendered scene."))
+    st.markdown("---")
+    st.caption(tr("완성한 이야기를 더 이어갈까, 새로운 이야기를 시작할까?", "Continue this story or begin a new one?"))
+    left, right = st.columns(2)
+    with left:
+        if st.button(tr("✨ 연결해서 이야기 만들기", "✨ Continue this story"),type="primary",use_container_width=True):
+            # Preserve all previous choices, and generate new events based on the whole history.
+            ss.previous_story_text = (ss.previous_story_text + "\n" + "\n".join(ss.story.get("pages", []))).strip()
+            ss.continuation_count += 1
+            ss.continuation_start = len(ss.events)
+            ss.ending = ""
+            ss.title = ""
+            ss.story = None
+            ss.notice = ""
+            ss.options = options_for("event")
+            go(4)
+    with right:
+        if st.button(tr("🍡 다른 이야기 만들기", "🍡 Make a different story"),use_container_width=True):
+            for key in ("stage","topic","sauce","genre","hero","place","events","ending","title","options","notice","story","ai_model","ai_error","continuation_start","previous_story_text","continuation_count"):
+                ss.pop(key,None)
+            st.rerun()
