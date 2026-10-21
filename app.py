@@ -508,7 +508,7 @@ if ss.stage == -1:
 
 skewer_data = base64.b64encode((BASE / "pastel_marshmallow_skewer.png").read_bytes()).decode("ascii")
 if ss.stage != 6:
-    st.markdown(f'<div class="oven-title"><img alt="Pastel marshmallow skewer" style="height:68px;width:68px;object-fit:contain;vertical-align:middle;margin-right:8px" src="data:image/png;base64,{skewer_data}"/> {tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</div><div class="oven-tag">{tr("나만의 이야기를 맛있게 구워볼까요?", "Let\'s bake the story in your imagination!")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="oven-title"><img alt="Pastel marshmallow skewer" style="height:68px;width:68px;object-fit:contain;vertical-align:middle;margin-right:8px" src="data:image/png;base64,{skewer_data}"/> {tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</div><div class="oven-tag">{tr("우리 같이 특별한 이야기를 구워볼래?", "Shall we bake a special story together?")}</div>', unsafe_allow_html=True)
 language_picker()
 steps = (["소재와 소스", "장르 고르기", "주인공 고르기", "장소 고르기", "사건 만들기", "결말 쓰기", "동화책 완성"] if ss.lang == "한국어" else ["Topic & sauce", "Pick a genre", "Choose a hero", "Choose a place", "Story events", "Write an ending", "Your storybook"])
 # A pastel twisted marshmallow grows as the child makes story choices.
