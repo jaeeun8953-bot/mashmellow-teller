@@ -84,7 +84,8 @@ def ai_options(kind, count=4):
         if not key: raise RuntimeError("missing API key")
         try: model=st.secrets.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
         except Exception: model=os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
-        response=genai.Client(api_key=key).models.generate_content(model=model,contents=prompt)
+        with genai.Client(api_key=key) as client:
+            response = client.models.generate_content(model=model, contents=prompt)
         raw=(response.text or "").strip()
         match=re.search(r'\{.*\}',raw,re.S)
         data=json.loads(match.group(0) if match else raw)
@@ -157,9 +158,10 @@ if ss.stage==0:
             else:
                 try:
                     from google import genai
-                    result = genai.Client(api_key=api_key).models.generate_content(
-                        model=model_name, contents="한국어로 '연결 성공'이라고 짧게 답하세요."
-                    )
+                    with genai.Client(api_key=api_key) as client:
+                        result = client.models.generate_content(
+                            model=model_name, contents="한국어로 '연결 성공'이라고 짧게 답하세요."
+                        )
                     if result.text and result.text.strip():
                         st.success("Gemini 연결 성공! " + result.text.strip()[:80])
                     else:
