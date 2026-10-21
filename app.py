@@ -79,14 +79,12 @@ div.stButton>button[kind="primary"]{background:#e68f9b;color:white;border-color:
 /* Twisted pastel marshmallow inspired by the user's spiral candy reference. */
 .marsh-scene{position:relative;margin:14px 4px 6px;padding:15px 12px 5px;min-height:158px;background:radial-gradient(ellipse at 50% 68%,#ffe8e4 0%,#fff7f0 65%,transparent 78%);border-radius:26px}
 .marsh-runway{position:relative;width:100%;height:118px;overflow:visible}
-.marsh-body{position:absolute;left:0;top:12px;height:78px;min-width:108px;box-sizing:border-box;border:3px solid #fff9f8;border-radius:44% 33% 40% 32% / 47% 43% 52% 48%;background:repeating-linear-gradient(122deg,#fffdfb 0px,#fffdfb 20px,#f9d6f4 22px,#f9d6f4 43px,#fff6bb 45px,#fff6bb 65px,#bce9fc 67px,#bce9fc 88px,#fffdfb 90px,#fffdfb 108px);background-size:220px 180px;box-shadow:inset 0 9px 12px #ffffffc9,inset 0 -11px 15px #cfb5d063,0 10px 14px #b7899452;transition:width .75s cubic-bezier(.22,.8,.26,1);animation:marsh-squish .8s ease both;isolation:isolate}
-.marsh-body:before{content:"";position:absolute;inset:7px 9px;border-radius:inherit;background:repeating-linear-gradient(122deg,transparent 0px,transparent 33px,#ffffff52 36px,#ffffff10 52px,transparent 69px);filter:blur(3px);pointer-events:none}
-.marsh-body:after{content:"";position:absolute;left:8px;right:8px;top:5px;height:14px;border-radius:50%;background:#ffffff88;filter:blur(6px);pointer-events:none}
+.marsh-body{position:absolute;left:0;top:10px;height:90px;min-width:105px;box-sizing:border-box;border-radius:999px;background-image:var(--soft-marshmallow);background-repeat:no-repeat;background-position:center;background-size:100% 100%;filter:drop-shadow(0 8px 8px #b7899440);transition:width .75s cubic-bezier(.22,.8,.26,1);animation:marsh-squish .8s ease both}
 .marsh-sparkle{position:absolute;right:0;top:0;color:#e8a54b;font-size:22px;animation:twinkle 1.8s ease-in-out infinite}
 .marsh-caption{text-align:center;color:#9b6a65;font-size:.91rem;font-weight:650;margin:5px 0 12px}
 @keyframes marsh-squish{0%{transform:scaleY(.85) skewX(-3deg)}55%{transform:scaleY(1.08) skewX(2deg)}100%{transform:scaleY(1) skewX(0)}}
 @keyframes twinkle{50%{opacity:.45;transform:scale(.8)}}
-@media(max-width:520px){.marsh-scene{min-height:140px}.marsh-runway{height:105px}.marsh-body{height:70px}}
+@media(max-width:520px){.marsh-scene{min-height:140px}.marsh-runway{height:105px}.marsh-body{height:75px}}
 @media(prefers-reduced-motion:reduce){.marsh-body,.marsh-sparkle{animation:none;transition:none}}
 </style>
 """
@@ -512,10 +510,11 @@ steps = (["소재와 소스", "장르 고르기", "주인공 고르기", "장소
 # Event choices count as small extra growth within the event stage.
 progress_fraction = min(1.0, (ss.stage + min(len(ss.events), 3) * (0.18 if ss.stage == 4 else 0)) / 6)
 progress_width = round(18 + 80 * progress_fraction, 1)
+soft_marshmallow = base64.b64encode((BASE / "marshmallow_soft_progress.png").read_bytes()).decode("ascii")
 progress_label = tr("마시멜로가 쭈욱~ 이야기가 자라고 있어요!", "Squish! Your marshmallow grows with your story!")
 st.markdown(f'''<div class="marsh-scene" role="progressbar" aria-label="Story progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{round(progress_fraction*100)}">
  <div class="marsh-runway">
-  <div class="marsh-body" style="width:{progress_width}%">
+  <div class="marsh-body" style="width:{progress_width}%;--soft-marshmallow:url('data:image/png;base64,{soft_marshmallow}')">
   </div><span class="marsh-sparkle">✦</span>
  </div>
 </div><div class="marsh-caption">{progress_label}</div>''', unsafe_allow_html=True)
