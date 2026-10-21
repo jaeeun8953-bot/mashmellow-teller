@@ -33,7 +33,7 @@ PLACE_FALLBACK = ["🏖️ 반짝이는 바닷가", "🌲 바람이 부는 숲",
 CSS = """
 <style>
 .stApp{background:linear-gradient(145deg,#fff4ed 0%,#fff9f3 48%,#f8f0ff 100%)}
-.block-container{max-width:1100px;padding-top:1.5rem;padding-bottom:5rem}
+.block-container{max-width:1100px;padding-top:4rem;padding-bottom:5rem}
 h1,h2,h3{color:#71433e;letter-spacing:-.025em}
 div.stButton>button{border-radius:20px;min-height:3.25rem;height:auto;white-space:normal;background:#fffefa;color:#6b4943;border:1px solid #f1cfc5;padding:12px 14px}
 div.stButton>button:hover{background:#fff0e9;border-color:#e79e9e;color:#70423b}
@@ -344,16 +344,19 @@ def draw_scene(page_number):
 
 def html_book():
     title = html.escape(ss.story["title"])
-    sections = []
-    for i, para in enumerate(ss.story["pages"]):
-        picture = base64.b64encode(draw_scene(i)).decode("ascii")
-        sections.append(f'<section class="page"><img src="data:image/png;base64,{picture}"/><p>{html.escape(para)}</p><small>{i+1}</small></section>')
-    return ("<!doctype html><html lang='"+("ko" if ss.lang == "한국어" else "en")+"'><meta charset='utf-8'><title>"+title+"</title><style>body{background:#f9eee9;font-family:serif;color:#624d42;max-width:750px;margin:30px auto;padding:15px}.cover,.page{background:#fffdf5;padding:32px;border-radius:15px;box-shadow:0 4px 15px #ad9b8940;margin:25px 0;text-align:center;page-break-after:always}.cover{padding:100px 20px;background:#fce4da}h1{font-size:2.7em}.page img{width:100%;border-radius:14px}.page p{text-align:left;line-height:2.1;font-size:1.2em;white-space:pre-wrap}.page small{color:#b2a096}@media print{body{background:white}.page,.cover{box-shadow:none}}</style><div class='cover'><h3>🍡 "+tr("말랑말랑 스토리 오븐", "Squishy Story Oven")+"</h3><h1>"+title+"</h1><p>"+tr("내가 구운 세상에 하나뿐인 이야기", "My one-of-a-kind story")+"</p></div>"+"".join(sections)+"</html>")
+    paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
+    picture = base64.b64encode(draw_scene(0)).decode("ascii")
+    brand = tr("말랑말랑 스토리 오븐", "Squishy Story Oven")
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>{title}</title>
+    <style>body{{background:#f9eee9;color:#624d42;font-family:Georgia,serif;max-width:760px;margin:30px auto;padding:15px}}
+    article{{background:#fffdf5;padding:36px;border-radius:20px}}
+    h1,h3{{text-align:center}}img{{width:100%;max-height:360px;object-fit:cover;border-radius:14px}}
+    p{{line-height:2.1;font-size:1.15em;white-space:pre-wrap;margin:1.2em 0}}</style></head>
+    <body><article><h3>{brand}</h3><h1>{title}</h1><img src="data:image/png;base64,{picture}"/>{paragraphs}</article></body></html>"""
 
-# Language is available on every screen, including the cover.
-_, lang_column = st.columns([5, 1.6])
-with lang_column:
-    st.selectbox("Language / 언어", ["한국어", "English"], key="lang", label_visibility="collapsed")
+# The language control is placed in normal document flow, not near the cropped top edge.
+def language_picker():
+    st.selectbox("🌐 언어 / Language", ["한국어", "English"], key="lang")
 
 if ss.stage == -1:
     # The cover is the exact user-provided image. No duplicated headline or fake button.
@@ -362,9 +365,12 @@ if ss.stage == -1:
         st.image(str(BASE / "story_oven_home.png"), use_container_width=True)
         if st.button(tr("🍡 이야기 구우러 가기 →", "🍡 Let's Bake a Story →"), type="primary", use_container_width=True, key="real_start_button"):
             go(0)
+        language_picker()
     st.stop()
 
-st.markdown(f'<div class="oven-title">🍡 {tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</div><div class="oven-tag">{tr("내 마음속 이야기를 맛있게 구워볼까요?", "Let's bake the story in your imagination!")}</div>', unsafe_allow_html=True)
+skewer_data = base64.b64encode((BASE / "pastel_marshmallow_skewer.png").read_bytes()).decode("ascii")
+st.markdown(f'<div class="oven-title"><img alt="Pastel marshmallow skewer" style="height:68px;width:68px;object-fit:contain;vertical-align:middle;margin-right:8px" src="data:image/png;base64,{skewer_data}"/> {tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</div><div class="oven-tag">{tr("내 마음속 이야기를 맛있게 구워볼까요?", "Let\'s bake the story in your imagination!")}</div>', unsafe_allow_html=True)
+language_picker()
 steps = (["소재와 소스", "장르 고르기", "주인공 고르기", "장소 고르기", "사건 만들기", "결말 쓰기", "동화책 완성"] if ss.lang == "한국어" else ["Topic & sauce", "Pick a genre", "Choose a hero", "Choose a place", "Story events", "Write an ending", "Your storybook"])
 # A pastel twisted marshmallow grows as the child makes story choices.
 # Event choices count as small extra growth within the event stage.
@@ -480,14 +486,13 @@ elif ss.stage == 6:
     if ss.notice:st.warning(tr(ss.notice, "AI is unavailable, so example choices are shown. Please check the adult connection settings."))
     title=ss.story["title"]
     st.markdown(f'<div class="book-cover"><div style="font-size:4rem">🍡 📖 ✨</div><p>{tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</p><h1>{html.escape(title)}</h1><p>{tr("내가 만든 세상에 하나뿐인 이야기", "My one-of-a-kind story")}</p></div>',unsafe_allow_html=True)
-    for i,para in enumerate(ss.story["pages"]):
-        st.image(draw_scene(i),use_container_width=True)
-        st.markdown(f'<div class="book-page"><p>{html.escape(para)}</p><div class="page-no">— {i+1} —</div></div>',unsafe_allow_html=True)
-        st.write("")
+    st.image(draw_scene(0), use_container_width=True)
+    paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
+    st.markdown(f'<div class="book-page">{paragraphs}</div>', unsafe_allow_html=True)
     st.caption(tr(ss.story.get("ending_note",""), "The ending has been polished to fit the story."))
     with st.expander(tr("✏️ 내가 처음 쓴 결말 보기", "✏️ See my original ending")):
         st.write(ss.ending)
-    st.download_button(tr("📥 그림이 포함된 동화책 다운로드 (.html)", "📥 Download illustrated storybook (.html)"),data=html_book().encode("utf-8"),file_name=f"marshmallow_story_{datetime.now():%Y%m%d}.html",mime="text/html",use_container_width=True)
+    st.download_button(tr("📥 한 페이지 동화 다운로드 (.html)", "📥 Download one-page story (.html)"),data=html_book().encode("utf-8"),file_name=f"marshmallow_story_{datetime.now():%Y%m%d}.html",mime="text/html",use_container_width=True)
     st.caption(tr("HTML 파일을 브라우저로 열어 인쇄 → PDF로 저장할 수도 있어요. 그림은 선택한 배경·사건을 바탕으로 앱이 직접 그린 삽화예요.", "Open the HTML in a browser and use Print → Save as PDF. Illustrations are generated locally from your choices."))
     if st.button(tr("🍡 새 이야기 굽기", "🍡 Bake another story"),type="primary",use_container_width=True):
         for key in ("stage","topic","sauce","genre","hero","place","events","ending","title","options","notice","story","ai_model","ai_error"):
