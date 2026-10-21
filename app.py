@@ -94,3 +94,122 @@ def ai_options(kind, count=4):
         # Rotate using number of selected events to avoid always identical options.
         shift=len(ss.events)*3 % len(pool)
         return (pool[shift:]+pool[:shift])[:4]
+
+
+def go(stage):
+    st.session_state.stage=stage
+    st.rerun()
+
+
+def make_story():
+    ss=st.session_state
+    char=ss.character.split(" ",1)[-1]
+    place=ss.place.split(" ",1)[-1]
+    intro=f"옛날 옛적, {ss.topic}에 관심이 많은 {char}가 있었어요. 어느 날 {char}는 {place}에 가게 되었지요."
+    paragraphs=[intro]
+    for i,event in enumerate(ss.events):
+        lead=["그때", "잠시 뒤", "그러던 어느 순간", "조금 후"][i%4]
+        paragraphs.append(f"{lead}, {event.rstrip(' .')}.")
+    paragraphs.append(ss.ending.strip())
+    return "\n\n".join(paragraphs)
+
+st.markdown('<div class="hero"><div style="font-size:3.8rem">🍡</div><h1>마시멜로</h1><b>말랑말랑, 나만의 스토리텔링 수업</b><p>상상 한 스푼, 이야기가 몽글몽글!</p></div>',unsafe_allow_html=True)
+ss=st.session_state
+steps=["소재와 소스","과자 친구","이야기 장소","사건 만들기","나만의 결말","동화책 완성"]
+st.progress(ss.stage/5)
+st.caption(f"{min(ss.stage+1,6)} / 6 · {steps[ss.stage]}")
+
+if ss.stage==0:
+    st.subheader("🍡 어떤 이야기를 만들어 볼까?")
+    st.text_input("이야기 소재",key="topic",placeholder="예: 바다, 공룡, 학교, 별")
+    st.markdown("#### 소스를 골라 줘!")
+    st.radio("이야기 맛",list(SAUCES),key="sauce",horizontal=True)
+    st.info(SAUCES[ss.sauce])
+    st.caption("이름, 학교, 주소, 전화번호 같은 개인정보는 적지 말아 줘.")
+    with st.expander("🔧 Gemini 연결 확인 (보호자용)"):
+        try:
+            api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+        except Exception:
+            api_key = os.getenv("GEMINI_API_KEY")
+        try:
+            model_name = st.secrets.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+        except Exception:
+            model_name = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
+        st.write("API 키 등록:", "✅ 감지됨" if api_key else "❌ 감지되지 않음")
+        st.write("사용 모델:", model_name)
+        if st.button("Gemini 테스트 요청 보내기"):
+            if not api_key:
+                st.error("GEMINI_API_KEY가 등록되지 않았어요.")
+            else:
+                try:
+                    from google import genai
+                    result = genai.Client(api_key=api_key).models.generate_content(
+                        model=model_name, contents="한국어로 '연결 성공'이라고 짧게 답하세요."
+                    )
+                    if result.text and result.text.strip():
+                        st.success("Gemini 연결 성공! " + result.text.strip()[:80])
+                    else:
+                        st.error("연결되었지만 Gemini 응답이 비어 있어요.")
+                except Exception as e:
+                    st.error(friendly_ai_error(e))
+                    print("Marshmallow Gemini test error:", type(e).__name__, "HTTP:", getattr(e, "code", None), "status:", getattr(e, "status", None))
+    if st.button("🍪 과자 친구 만나러 가기",type="primary",use_container_width=True,disabled=not ss.topic.strip()):
+        ss.options=ai_options("character");go(1)
+
+elif ss.stage==1:
+    st.subheader("🍪 어떤 과자 친구와 떠날까?")
+    st.caption(f"소재: {ss.topic} · 소스: {ss.sauce}")
+    if ss.warning: st.warning(ss.warning)
+    for i,opt in enumerate(ss.options):
+        if st.button(opt,key=f"character_{i}",use_container_width=True):
+            ss.character=opt;ss.options=ai_options("place");go(2)
+    if st.button("← 소스 다시 고르기"):go(0)
+
+elif ss.stage==2:
+    st.subheader("🏝️ 이야기는 어디서 시작할까?")
+    st.caption(f"주인공: {ss.character}")
+    if ss.warning:st.warning(ss.warning)
+    for i,opt in enumerate(ss.options):
+        if st.button(opt,key=f"place_{i}",use_container_width=True):
+            ss.place=opt;ss.events=[];ss.options=ai_options("event");go(3)
+    if st.button("← 등장인물 다시 고르기"):
+        ss.options=ai_options("character");go(1)
+
+elif ss.stage==3:
+    st.subheader("✨ 다음엔 어떤 일이 일어날까?")
+    st.caption(f"{ss.character} · {ss.place}")
+    if ss.events:
+        st.markdown("**지금까지의 이야기**")
+        for i,event in enumerate(ss.events,1):st.write(f"{i}. {event}")
+    if ss.warning:st.warning(ss.warning)
+    for i,opt in enumerate(ss.options):
+        if st.button(f"☁️ {opt}",key=f"event_{len(ss.events)}_{i}",use_container_width=True):
+            ss.events.append(opt)
+            if len(ss.events)>=3:go(4)
+            ss.options=ai_options("event");st.rerun()
+    if ss.events and st.button("✏️ 이제 내가 결말을 쓸래!",type="primary",use_container_width=True):go(4)
+    if st.button("← 장소 다시 고르기"):
+        ss.options=ai_options("place");go(2)
+
+elif ss.stage==4:
+    st.subheader("✏️ 마지막 장면은 내가 만들어요")
+    st.caption("어떤 결말이든 좋아! 한 문장만 적어도 괜찮아.")
+    st.markdown("**지금까지 일어난 일**")
+    st.write(f"{ss.character}가 {ss.place}에서 이야기를 시작했어요.")
+    for event in ss.events:st.write(f"☁️ {event}")
+    st.text_area("나만의 결말",key="ending",height=160,placeholder="그래서 주인공은 어떻게 되었을까?")
+    st.text_input("동화책 제목 (선택)",key="title",placeholder=f"{ss.topic}의 비밀")
+    if st.button("📖 내 동화책 완성하기",type="primary",use_container_width=True,disabled=not ss.ending.strip()):go(5)
+    if st.button("← 이야기 더 만들기"):
+        ss.options=ai_options("event");go(3)
+
+elif ss.stage==5:
+    title=ss.title.strip() or f"{ss.topic}의 특별한 이야기"
+    story=make_story()
+    st.markdown(f"## 📖 {title}")
+    st.markdown(f'<div class="book">{("<p>"+"</p><p>".join(__import__("html").escape(x) for x in story.split(chr(10)+chr(10)))+"</p>")}</div>',unsafe_allow_html=True)
+    st.caption("마지막 문단은 내가 직접 쓴 결말이에요 💗")
+    st.download_button("📥 내 동화책 저장 (.txt)",data=f"{title}\n\n{story}",file_name=f"marshmallow_story_{datetime.now():%Y%m%d}.txt",mime="text/plain",use_container_width=True)
+    if st.button("🍡 새로운 이야기 만들기",type="primary",use_container_width=True):
+        for k in ["stage","topic","sauce","character","place","events","ending","title","options","warning"]:ss.pop(k,None)
+        st.rerun()
