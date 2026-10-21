@@ -30,6 +30,20 @@ def init():
 init()
 
 
+def safe_error_detail(error):
+    """Redact credentials from diagnostic text before showing it."""
+    detail = str(error)
+    try:
+        key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+        if key:
+            detail = detail.replace(str(key), "[API KEY HIDDEN]")
+    except Exception:
+        pass
+    detail = re.sub(r"AIza[0-9A-Za-z_-]{20,}", "[API KEY HIDDEN]", detail)
+    detail = re.sub(r"(?i)(key|token|secret|authorization)([=:]\s*)([^\s&,;]+)", r"\1\2[HIDDEN]", detail)
+    return detail[:700]
+
+
 def friendly_ai_error(error):
     """Show a useful diagnosis without revealing API keys or prompts."""
     name = type(error).__name__
@@ -79,7 +93,7 @@ def ai_options(kind, count=4):
         ss.warning=""
         return options
     except Exception as e:
-        ss.warning="⚠️ " + friendly_ai_error(e) + " 지금은 예시 선택지를 보여주고 있어요."
+        ss.warning="⚠️ " + friendly_ai_error(e) + " 지금은 예시 선택지를 보여주고 있어요. 보호자용 연결 테스트에서 상세 오류를 확인해 주세요."
         print("Marshmallow Gemini error:", type(e).__name__, "HTTP:", getattr(e, "code", None), "status:", getattr(e, "status", None))
         if kind=="character": return CHARACTERS
         if kind=="place": return PLACES
@@ -152,6 +166,7 @@ if ss.stage==0:
                         st.error("연결되었지만 Gemini 응답이 비어 있어요.")
                 except Exception as e:
                     st.error(friendly_ai_error(e))
+                    st.code("오류 종류: " + type(e).__name__ + "\n상세 내용: " + safe_error_detail(e), language="text")
                     print("Marshmallow Gemini test error:", type(e).__name__, "HTTP:", getattr(e, "code", None), "status:", getattr(e, "status", None))
     if st.button("🍪 과자 친구 만나러 가기",type="primary",use_container_width=True,disabled=not ss.topic.strip()):
         ss.options=ai_options("character");go(1)
