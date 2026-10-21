@@ -611,8 +611,22 @@ elif ss.stage == 5:
     st.text_area(tr("나만의 결말", "My ending"),key="ending",height=160,placeholder=tr("주인공은 어떻게 문제를 해결했을까? 마지막에 어떤 일이 일어났을까?", "How does the hero solve the problem? What happens at the end?"))
     st.text_input(tr("동화책 제목 (선택)", "Story title (optional)"),key="title",placeholder=(f"A special story about {ss.topic}" if ss.lang == "English" else f"{ss.topic}의 특별한 이야기"))
     if st.button(tr("📚 동화책 오븐에 넣기", "📚 Bake my storybook"),type="primary",use_container_width=True,disabled=not ss.ending.strip()):
-        with st.spinner(tr("이야기를 다듬고 그림책을 굽고 있어요…", "Polishing the story and baking your book…")):
+        with st.spinner(tr("이야기를 다듬고 그림을 그리고 있어요…", "Polishing your story and painting its illustration…")):
             finish_story()
+            # Generate a new illustration automatically for every newly baked story.
+            ss.pop("story_illustration", None)
+            ss.pop("story_illustration_mime", None)
+            ss.pop("illustration_error", None)
+            try:
+                image_bytes, image_mime = generate_story_illustration()
+                ss.story_illustration = image_bytes
+                ss.story_illustration_mime = image_mime
+            except Exception as error:
+                key, _ = get_key_model()
+                detail = str(error)
+                if key:
+                    detail = detail.replace(key, "[API KEY HIDDEN]")
+                ss.illustration_error = f"{type(error).__name__} (HTTP {getattr(error, 'code', '—')})\\n{detail[:1500]}"
         go(6)
     if st.button(tr("← 사건 더 고르기", "← Add more events")):
         ss.options=options_for("event")
@@ -621,36 +635,32 @@ elif ss.stage == 5:
 elif ss.stage == 6:
     st.subheader(tr("📖 짜잔! 나만의 동화책이 완성됐어", "📖 Ta-da! Your storybook is ready!"))
     if ss.notice:st.warning(tr(ss.notice, "AI is unavailable, so example choices are shown. Please check the adult connection settings."))
-    if not ss.get("story_illustration"):
-        st.info(tr("📖 이야기 속 장면을 그림으로 만들면 나만의 소장용 그림책이 완성돼요. (Gemini 이미지 생성 기능이 지원되는 API 키가 필요해요.)",
-                   "📖 Create a matching illustration for a keepsake storybook. (Your Gemini API key must support image generation.)"))
-        if st.button(tr("🎨 내 이야기 그림 그리기", "🎨 Illustrate my story"), type="primary", use_container_width=True):
-            with st.spinner(tr("이야기에 어울리는 장면을 그리고 있어요...", "Painting your story scene...")):
+    if ss.get("illustration_error"):
+        st.warning(tr("이야기는 완성됐지만 삽화를 만들지 못했어요. 아래에서 원인을 확인할 수 있어요.",
+                      "Your story is ready, but the illustration could not be generated. See details below."))
+        with st.expander(tr("🔎 그림 생성 오류 자세히 보기", "🔎 Image generation error"), expanded=True):
+            st.code(ss.illustration_error)
+        if st.button(tr("🎨 그림만 다시 시도하기", "🎨 Retry illustration"), use_container_width=True):
+            with st.spinner(tr("이야기에 맞는 삽화를 그리고 있어요…", "Painting your story…")):
                 try:
                     data, mime = generate_story_illustration()
                     ss.story_illustration = data
                     ss.story_illustration_mime = mime
+                    ss.pop("illustration_error", None)
                     st.rerun()
                 except Exception as error:
-                    st.warning(tr("삽화를 생성하지 못했어요. 이미지 생성 모델 사용 권한이나 할당량을 확인해 주세요.",
-                                  "Illustration unavailable. Check image model access and quota."))
-                    code = getattr(error, "code", None)
-                    detail = str(error)
-                    # Never reveal credentials even if an SDK exception includes them.
                     key, _ = get_key_model()
+                    detail = str(error)
                     if key:
                         detail = detail.replace(key, "[API KEY HIDDEN]")
-                    with st.expander(tr("🔎 그림 생성 오류 자세히 보기", "🔎 Image error details"), expanded=True):
-                        st.code(f"{type(error).__name__} / HTTP {code or '—'}\n{detail[:1800]}")
-                        st.caption(tr("404: 모델 이름 또는 접근 권한 확인 · 429: 사용량 한도 확인 · 403: API 권한 또는 결제 설정 확인", "404: model/access · 429: quota · 403: permissions/billing"))
-    if ss.get("story_illustration"):
-        st.image(ss.story_illustration, caption=tr("내 이야기 속 한 장면", "A scene from my story"), use_container_width=True)
+                    ss.illustration_error = f"{type(error).__name__} (HTTP {getattr(error, 'code', '—')})\\n{detail[:1500]}"
+                    st.rerun()
     st.markdown(book_markup(), unsafe_allow_html=True)
     st.caption(tr(ss.story.get("ending_note",""), "The ending has been polished to fit the story."))
     with st.expander(tr("✏️ 내가 처음 쓴 결말 보기", "✏️ See my original ending")):
         st.write(ss.ending)
     st.download_button(tr("📥 한 페이지 동화 다운로드 (.html)", "📥 Download one-page story (.html)"),data=html_book().encode("utf-8"),file_name=f"marshmallow_story_{datetime.now():%Y%m%d}.html",mime="text/html",use_container_width=True)
-    st.caption(tr("그림이 생성되면 다운로드하는 동화책에도 함께 들어가요.", "Generated art is included in your downloaded storybook."))
+    st.caption(tr("삽화가 생성되면 동화책과 다운로드 파일에 자동으로 포함돼요.", "The illustration is included automatically in the storybook and download."))
     st.markdown("---")
     st.caption(tr("완성한 이야기를 더 이어갈까, 새로운 이야기를 시작할까?", "Continue this story or begin a new one?"))
     left, right = st.columns(2)
@@ -665,11 +675,12 @@ elif ss.stage == 6:
             ss.story = None
             ss.pop("story_illustration", None)
             ss.pop("story_illustration_mime", None)
+            ss.pop("illustration_error", None)
             ss.notice = ""
             ss.options = options_for("event")
             go(4)
     with right:
         if st.button(tr("🍡 다른 이야기 만들기", "🍡 Make a different story"),use_container_width=True):
-            for key in ("stage","topic","sauce","genre","hero","place","events","ending","title","options","notice","story","ai_model","ai_error","continuation_start","previous_story_text","continuation_count","story_illustration","story_illustration_mime"):
+            for key in ("stage","topic","sauce","genre","hero","place","events","ending","title","options","notice","story","ai_model","ai_error","continuation_start","previous_story_text","continuation_count","story_illustration","story_illustration_mime","illustration_error"):
                 ss.pop(key,None)
             st.rerun()
