@@ -44,6 +44,17 @@ div.stButton>button[kind="primary"]{background:#e68f9b;color:white;border-color:
 .soft-card{background:#fffaf7;border:1px solid #f4d8cf;border-radius:25px;padding:18px;margin:10px 0}
 .book-cover{background:linear-gradient(155deg,#ffd8c5,#fff4db,#f9dbea);border:9px double #f8fff9;border-radius:22px;min-height:340px;padding:40px 25px;text-align:center;box-shadow:10px 12px 20px #b7838040}
 .book-cover h1{font-family:Georgia,serif;font-size:2.7rem;margin:30px 0;color:#714139}
+/* A readable illustrated book: visible scene, textured paper and a central book seam. */
+.picturebook-wrap{padding:clamp(12px,3vw,32px);background:linear-gradient(135deg,#dbaaa2,#f8dbbf 42%,#d9b3a7);border-radius:25px;box-shadow:0 16px 30px #a8797140}
+.picturebook{position:relative;overflow:hidden;background:linear-gradient(90deg,#e9d5b8 0%,#fff9e9 4%,#fffdf4 49%,#f0e3cc 50%,#fffdf4 52%,#fff9e9 96%,#e8d4b6 100%);border:1px solid #d9bca0;border-radius:12px 28px 28px 12px;box-shadow:inset 8px 0 13px #9e78541f,inset -9px 0 13px #9e78541c,5px 8px 0 #d1b598;padding:clamp(22px,5vw,55px)}
+.picturebook:before{content:"";position:absolute;left:49.8%;top:0;bottom:0;width:2px;background:linear-gradient(90deg,#cfb89a77,#ffffff9e);pointer-events:none;opacity:.38}
+.picturebook h2{text-align:center;font-family:Georgia,"Noto Serif KR",serif;font-size:clamp(1.5rem,3.7vw,2.4rem);color:#75473d;margin:6px 0 12px;line-height:1.4}
+.picturebook .book-ornament{text-align:center;color:#d5a46d;letter-spacing:.5em;margin-bottom:22px}
+.picturebook .scene-window{display:block;width:100%;height:clamp(185px,29vw,330px);object-fit:cover;border-radius:15px;border:7px solid #fff7e7;box-shadow:0 3px 12px #ab877b3d;margin:0 auto 28px}
+.picturebook .book-prose{max-width:760px;margin:auto}
+.picturebook p{font-size:clamp(1rem,2.2vw,1.15rem);line-height:2.15;color:#604c43;white-space:pre-wrap;margin:1.25em 0;overflow-wrap:anywhere}
+.picturebook .book-end{text-align:center;color:#c59a78;letter-spacing:.9em;margin-top:28px}
+@media(max-width:650px){.picturebook-wrap{padding:9px}.picturebook{padding:22px 19px}.picturebook:before{display:none}}
 .story-paper{position:relative;isolation:isolate;overflow:hidden;background:#fffaf0;border:1px solid #e7cdb6;border-radius:17px;padding:clamp(24px,6vw,62px);box-shadow:0 8px 24px #ad8a7052;line-height:2.15;color:#59493f}
 .story-paper::before{content:"";position:absolute;inset:0;z-index:-1;background-image:linear-gradient(180deg,rgba(255,251,239,.72) 0%,rgba(255,251,239,.86) 35%,rgba(255,251,239,.96) 100%),var(--story-art);background-size:cover,100% auto;background-position:center,center top;background-repeat:no-repeat;opacity:1}
 .story-paper::after{content:"✦  ✧  ✦";display:block;text-align:center;color:#c9a58b;letter-spacing:1.2rem;margin-top:20px}
@@ -399,19 +410,29 @@ def draw_scene(page_number=0):
     b=io.BytesIO();im.save(b,format="PNG");return b.getvalue()
 
 
-def html_book():
+def book_markup():
+    """Identical storybook structure for Streamlit and downloaded HTML."""
     title = html.escape(ss.story["title"])
     paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
     picture = base64.b64encode(draw_scene(0)).decode("ascii")
-    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>
-    <style>body{{background:#f9eee9;color:#59493f;font-family:Georgia,serif;max-width:800px;margin:25px auto;padding:15px}}
-    article{{background:#fffaf0;border:1px solid #e7cdb6;border-radius:18px;padding:clamp(24px,6vw,62px);
-    background-image:linear-gradient(180deg,rgba(255,251,239,.73),rgba(255,251,239,.91) 35%,rgba(255,251,239,.97) 100%),url('data:image/png;base64,{picture}');
-    background-size:cover,100% auto;background-repeat:no-repeat;background-position:center top;box-shadow:0 8px 24px #ad8a7052}}
-    h1,h3{{text-align:center}}h1{{font-size:2.2em;color:#704b41}}h3{{color:#9b7c70}}
-    p{{line-height:2.2;font-size:1.13em;white-space:pre-wrap;margin:1.2em 0;overflow-wrap:anywhere}}
-    @media print{{body{{background:white;margin:0}}article{{box-shadow:none}}}}</style></head>
-    <body><article><h1>{title}</h1>{paragraphs}</article></body></html>"""
+    alt = tr("이야기 소재와 등장인물에 맞춰 그린 삽화", "Illustration based on the story")
+    return (f'<div class="picturebook-wrap"><article class="picturebook">'
+            f'<h2>{title}</h2><div class="book-ornament">✦ ── ✧ ── ✦</div>'
+            f'<img class="scene-window" alt="{alt}" src="data:image/png;base64,{picture}">'
+            f'<div class="book-prose">{paragraphs}</div>'
+            f'<div class="book-end">✦ ✧ ✦</div></article></div>')
+
+
+def html_book():
+    title = html.escape(ss.story["title"])
+    book_css = CSS.replace("<style>", "").replace("</style>", "")
+    return (f'<!doctype html><html><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>{title}</title><style>{book_css}'
+            f'body{{max-width:950px;margin:30px auto;padding:12px;background:#fff7f0}}'
+            f'@media print{{.picturebook-wrap{{box-shadow:none;padding:0}}'
+            f'.picturebook{{box-shadow:none}}}}</style></head>'
+            f'<body>{book_markup()}</body></html>')
 
 # The language control is placed in normal document flow, not near the cropped top edge.
 def language_picker():
@@ -546,12 +567,7 @@ elif ss.stage == 5:
 elif ss.stage == 6:
     st.subheader(tr("📖 짜잔! 나만의 동화책이 완성됐어", "📖 Ta-da! Your storybook is ready!"))
     if ss.notice:st.warning(tr(ss.notice, "AI is unavailable, so example choices are shown. Please check the adult connection settings."))
-    title=ss.story["title"]
-    picture = base64.b64encode(draw_scene(0)).decode("ascii")
-    paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
-    paper = (f'<article class="story-paper" style="--story-art:url(data:image/png;base64,{picture})">'
-             f'<h2>{html.escape(title)}</h2>{paragraphs}</article>')
-    st.markdown(paper, unsafe_allow_html=True)
+    st.markdown(book_markup(), unsafe_allow_html=True)
     st.caption(tr(ss.story.get("ending_note",""), "The ending has been polished to fit the story."))
     with st.expander(tr("✏️ 내가 처음 쓴 결말 보기", "✏️ See my original ending")):
         st.write(ss.ending)
