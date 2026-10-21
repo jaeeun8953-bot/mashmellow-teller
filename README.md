@@ -1,14 +1,10 @@
-# 마시멜로 🍡
+# 말랑말랑 스토리 오븐
 
-8~10세 어린이를 위한 선택형 스토리텔링 Streamlit 앱.
+8~10세 어린이를 위한 스토리텔링 웹앱. 소재와 소스(초코=현실, 딸기=상상, 바닐라=혼합), 장르, 주인공, 장소, 사건을 고른 뒤 아이가 직접 결말을 쓰면 이야기 문체를 통일해 동화책으로 완성합니다.
 
-## 실행
-
-```bash
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-Gemini AI 선택지를 사용하려면 Streamlit Secrets에 `GEMINI_API_KEY = "..."`를 설정하세요. 없으면 기본 예시 선택지로 동작합니다. 모델은 기본적으로 `gemini-2.5-flash`이며 `GEMINI_MODEL`로 변경할 수 있습니다.
-
-어린이의 이름, 학교, 주소, 연락처를 입력하지 않도록 안내하며 이야기는 별도 서버 DB에 저장하지 않습니다. Gemini를 연결하면 입력 내용이 AI 제공자에게 전송됩니다. 성인 보호자와 함께 이용해 주세요.
+## Streamlit Cloud
+- 이 폴더의 `app.py`, `requirements.txt`, `marshmallow_mascot.png`, `story_oven.png`를 GitHub 저장소 루트에 업로드하세요.
+- Streamlit Community Cloud의 앱 Secrets에 `GEMINI_API_KEY = "..."`를 설정하세요. 필요하다면 `GEMINI_MODEL`도 설정할 수 있습니다.
+- Gemini 호출이 실패하면 선택지는 임시 예시로, 완성 책은 아이가 쓴 결말 원문을 포함한 임시 버전으로 표시됩니다.
+- 그림책 삽화는 선택된 장소와 사건에 맞춰 앱이 그리는 파스텔 풍경입니다. 생성형 이미지 API를 통한 세부 장면 일러스트는 아직 지원하지 않습니다.
+- 최종 HTML 책 파일은 브라우저에서 열어 PDF로 인쇄할 수 있습니다.
