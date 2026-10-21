@@ -419,7 +419,8 @@ def language_picker():
 
 if ss.stage == -1:
     # The cover is the exact user-provided image. No duplicated headline or fake button.
-    left, middle, right = st.columns([1, 2.4, 1])
+    # Wider cover: fill most of the available page without distorting the image.
+    left, middle, right = st.columns([0.35, 5.3, 0.35])
     with middle:
         st.image(str(BASE / "story_oven_home.png"), use_container_width=True)
         if st.button(tr("🍡 이야기 구우러 가기 →", "🍡 Let's Bake a Story →"), type="primary", use_container_width=True, key="real_start_button"):
