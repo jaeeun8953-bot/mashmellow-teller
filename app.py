@@ -44,6 +44,12 @@ div.stButton>button[kind="primary"]{background:#e68f9b;color:white;border-color:
 .soft-card{background:#fffaf7;border:1px solid #f4d8cf;border-radius:25px;padding:18px;margin:10px 0}
 .book-cover{background:linear-gradient(155deg,#ffd8c5,#fff4db,#f9dbea);border:9px double #f8fff9;border-radius:22px;min-height:340px;padding:40px 25px;text-align:center;box-shadow:10px 12px 20px #b7838040}
 .book-cover h1{font-family:Georgia,serif;font-size:2.7rem;margin:30px 0;color:#714139}
+.story-paper{position:relative;isolation:isolate;overflow:hidden;background:#fffaf0;border:1px solid #e7cdb6;border-radius:17px;padding:clamp(24px,6vw,62px);box-shadow:0 8px 24px #ad8a7052;line-height:2.15;color:#59493f}
+.story-paper::before{content:"";position:absolute;inset:0;z-index:-1;background-image:linear-gradient(180deg,rgba(255,251,239,.73) 0%,rgba(255,251,239,.88) 30%,rgba(255,251,239,.94) 65%,rgba(255,251,239,.97) 100%),var(--story-art);background-size:cover,100% auto;background-position:center,center top;background-repeat:no-repeat;opacity:1}
+.story-paper::after{content:"✦  ✧  ✦";display:block;text-align:center;color:#c9a58b;letter-spacing:1.2rem;margin-top:20px}
+.story-paper h2{font-family:Georgia,"Noto Serif KR",serif;text-align:center;font-size:clamp(1.5rem,4vw,2.3rem);margin:0 0 8px;color:#704b41}
+.story-paper .story-brand{text-align:center;color:#9b7c70;font-size:.84rem;margin-bottom:22px;letter-spacing:.04em}
+.story-paper p{font-size:clamp(1rem,2.3vw,1.13rem);white-space:pre-wrap;margin:1.2em 0;line-height:2.2;overflow-wrap:anywhere}
 .book-page{background:#fffdf6;border:1px solid #e9d8bd;border-radius:18px;padding:25px 32px;line-height:2.1;min-height:280px;color:#624f46;box-shadow:4px 6px 14px #c4a78b25}
 .book-page p{font-size:1.07rem;white-space:pre-wrap}
 .page-no{text-align:center;color:#a88c78;font-size:.8rem;margin-top:12px}
@@ -347,12 +353,15 @@ def html_book():
     paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
     picture = base64.b64encode(draw_scene(0)).decode("ascii")
     brand = tr("말랑말랑 스토리 오븐", "Squishy Story Oven")
-    return f"""<!doctype html><html><head><meta charset="utf-8"><title>{title}</title>
-    <style>body{{background:#f9eee9;color:#624d42;font-family:Georgia,serif;max-width:760px;margin:30px auto;padding:15px}}
-    article{{background:#fffdf5;padding:36px;border-radius:20px}}
-    h1,h3{{text-align:center}}img{{width:100%;max-height:360px;object-fit:cover;border-radius:14px}}
-    p{{line-height:2.1;font-size:1.15em;white-space:pre-wrap;margin:1.2em 0}}</style></head>
-    <body><article><h3>{brand}</h3><h1>{title}</h1><img src="data:image/png;base64,{picture}"/>{paragraphs}</article></body></html>"""
+    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{title}</title>
+    <style>body{{background:#f9eee9;color:#59493f;font-family:Georgia,serif;max-width:800px;margin:25px auto;padding:15px}}
+    article{{background:#fffaf0;border:1px solid #e7cdb6;border-radius:18px;padding:clamp(24px,6vw,62px);
+    background-image:linear-gradient(180deg,rgba(255,251,239,.73),rgba(255,251,239,.91) 35%,rgba(255,251,239,.97) 100%),url('data:image/png;base64,{picture}');
+    background-size:cover,100% auto;background-repeat:no-repeat;background-position:center top;box-shadow:0 8px 24px #ad8a7052}}
+    h1,h3{{text-align:center}}h1{{font-size:2.2em;color:#704b41}}h3{{color:#9b7c70}}
+    p{{line-height:2.2;font-size:1.13em;white-space:pre-wrap;margin:1.2em 0;overflow-wrap:anywhere}}
+    @media print{{body{{background:white;margin:0}}article{{box-shadow:none}}}}</style></head>
+    <body><article><h3>🍡 {brand}</h3><h1>{title}</h1>{paragraphs}</article></body></html>"""
 
 # The language control is placed in normal document flow, not near the cropped top edge.
 def language_picker():
@@ -485,10 +494,13 @@ elif ss.stage == 6:
     st.subheader(tr("📖 짜잔! 나만의 동화책이 완성됐어", "📖 Ta-da! Your storybook is ready!"))
     if ss.notice:st.warning(tr(ss.notice, "AI is unavailable, so example choices are shown. Please check the adult connection settings."))
     title=ss.story["title"]
-    st.markdown(f'<div class="book-cover"><div style="font-size:4rem">🍡 📖 ✨</div><p>{tr("말랑말랑 스토리 오븐", "Squishy Story Oven")}</p><h1>{html.escape(title)}</h1><p>{tr("내가 만든 세상에 하나뿐인 이야기", "My one-of-a-kind story")}</p></div>',unsafe_allow_html=True)
-    st.image(draw_scene(0), use_container_width=True)
+    picture = base64.b64encode(draw_scene(0)).decode("ascii")
     paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
-    st.markdown(f'<div class="book-page">{paragraphs}</div>', unsafe_allow_html=True)
+    brand = tr("말랑말랑 스토리 오븐", "Squishy Story Oven")
+    paper = (f'<article class="story-paper" style="--story-art:url(data:image/png;base64,{picture})">'
+             f'<div class="story-brand">🍡 {brand}</div><h2>{html.escape(title)}</h2>'
+             f'{paragraphs}</article>')
+    st.markdown(paper, unsafe_allow_html=True)
     st.caption(tr(ss.story.get("ending_note",""), "The ending has been polished to fit the story."))
     with st.expander(tr("✏️ 내가 처음 쓴 결말 보기", "✏️ See my original ending")):
         st.write(ss.ending)
