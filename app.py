@@ -63,6 +63,34 @@ def friendly_ai_error(error):
     return f"Gemini 요청 실패: {name}" + (f" (HTTP {code})" if code else "") + ". 앱 로그에서 오류 종류를 확인해 주세요."
 
 
+def gemini_request(client, prompt, preferred):
+    """Try configured model; on 404, discover models available to this API key."""
+    try:
+        return client.models.generate_content(model=preferred, contents=prompt), preferred
+    except Exception as first:
+        if getattr(first, "code", None) != 404:
+            raise
+        available = []
+        for item in client.models.list():
+            methods = getattr(item, "supported_actions", None) or getattr(item, "supported_generation_methods", None) or []
+            if methods and not any("generatecontent" in str(m).lower().replace("_", "") for m in methods):
+                continue
+            name = str(getattr(item, "name", "") or "").removeprefix("models/")
+            if name.startswith("gemini-") and not any(bad in name for bad in ("embedding", "image", "tts", "audio", "live")):
+                available.append(name)
+        available.sort(key=lambda name: ("flash" not in name, "pro" in name, name))
+        for name in available:
+            if name == preferred:
+                continue
+            try:
+                return client.models.generate_content(model=name, contents=prompt), name
+            except Exception as error:
+                if getattr(error, "code", None) in (400, 404):
+                    continue
+                raise
+        raise RuntimeError("이 API 키로 텍스트 생성 가능한 Gemini 모델을 찾지 못했어요. AI Studio에서 API 키와 모델 접근 권한을 확인해 주세요.") from first
+
+
 def ai_options(kind, count=4):
     ss=st.session_state
     context={"소재":ss.topic,"소스":ss.sauce,"소스 설명":SAUCES[ss.sauce],"등장인물":ss.character,"장소":ss.place,"이미 선택한 사건":ss.events}
@@ -85,7 +113,8 @@ def ai_options(kind, count=4):
         try: model=st.secrets.get("GEMINI_MODEL") or os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
         except Exception: model=os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
         with genai.Client(api_key=key) as client:
-            response = client.models.generate_content(model=model, contents=prompt)
+            response, used_model = gemini_request(client, prompt, model)
+            ss.active_model = used_model
         raw=(response.text or "").strip()
         match=re.search(r'\{.*\}',raw,re.S)
         data=json.loads(match.group(0) if match else raw)
@@ -151,7 +180,9 @@ if ss.stage==0:
         except Exception:
             model_name = os.getenv("GEMINI_MODEL") or "gemini-2.5-flash"
         st.write("API 키 등록:", "✅ 감지됨" if api_key else "❌ 감지되지 않음")
-        st.write("사용 모델:", model_name)
+        st.write("설정 모델:", model_name)
+        if ss.get("active_model"):
+            st.write("실제 사용 모델:", ss.active_model)
         if st.button("Gemini 테스트 요청 보내기"):
             if not api_key:
                 st.error("GEMINI_API_KEY가 등록되지 않았어요.")
@@ -159,11 +190,11 @@ if ss.stage==0:
                 try:
                     from google import genai
                     with genai.Client(api_key=api_key) as client:
-                        result = client.models.generate_content(
-                            model=model_name, contents="한국어로 '연결 성공'이라고 짧게 답하세요."
+                        result, used_model = gemini_request(
+                            client, "한국어로 '연결 성공'이라고 짧게 답하세요.", model_name
                         )
                     if result.text and result.text.strip():
-                        st.success("Gemini 연결 성공! " + result.text.strip()[:80])
+                        st.success("Gemini 연결 성공! 사용 모델: " + used_model + " · " + result.text.strip()[:80])
                     else:
                         st.error("연결되었지만 Gemini 응답이 비어 있어요.")
                 except Exception as e:
