@@ -44,6 +44,17 @@ div.stButton>button[kind="primary"]{background:#e68f9b;color:white;border-color:
 .soft-card{background:#fffaf7;border:1px solid #f4d8cf;border-radius:25px;padding:18px;margin:10px 0}
 .book-cover{background:linear-gradient(155deg,#ffd8c5,#fff4db,#f9dbea);border:9px double #f8fff9;border-radius:22px;min-height:340px;padding:40px 25px;text-align:center;box-shadow:10px 12px 20px #b7838040}
 .book-cover h1{font-family:Georgia,serif;font-size:2.7rem;margin:30px 0;color:#714139}
+/* Collectible illustrated keepsake: bookbinding, legible prose, elegant cover */
+.keepsake-shell{max-width:900px;margin:12px auto 28px;padding:14px;background:#f2d8cc;border-radius:25px;box-shadow:0 20px 42px #89635430}
+.keepsake-book{background:#fffaf0;border:1px solid #d8bca4;border-left:13px solid #b9757b;border-radius:12px 22px 22px 12px;padding:clamp(23px,5vw,60px);box-shadow:inset 6px 0 10px #bda08830,6px 7px 0 #d3b6a4}
+.keepsake-label{text-align:center;color:#a97b71;font-size:.78rem;letter-spacing:.2em}
+.keepsake-book h2{text-align:center;color:#734a42;font-family:Georgia,"Noto Serif KR",serif;font-size:clamp(1.65rem,4vw,2.6rem);line-height:1.45;margin:18px auto}
+.keepsake-ornament{text-align:center;color:#d6a774;margin:15px 0 25px;letter-spacing:.5em}
+.keepsake-illustration{display:block;width:100%;height:auto;max-height:470px;object-fit:contain;margin:8px auto 30px;border:8px solid #fff;box-shadow:0 5px 18px #8c665333;border-radius:8px}
+.keepsake-text{max-width:690px;margin:0 auto}
+.keepsake-text p{color:#55443d;line-height:2.15;font-size:clamp(1rem,2.2vw,1.14rem);white-space:pre-wrap;overflow-wrap:anywhere;margin:1.4em 0;text-indent:.6em}
+.keepsake-end{text-align:center;color:#b98c7b;font-size:1.15rem;letter-spacing:.5em;margin-top:30px}
+@media(max-width:600px){.keepsake-shell{padding:7px}.keepsake-book{padding:22px 16px;border-left-width:7px}}
 /* A readable illustrated book: visible scene, textured paper and a central book seam. */
 .picturebook-wrap{padding:clamp(12px,3vw,32px);background:linear-gradient(135deg,#dbaaa2,#f8dbbf 42%,#d9b3a7);border-radius:25px;box-shadow:0 16px 30px #a8797140}
 .picturebook{position:relative;overflow:hidden;background:linear-gradient(90deg,#e9d5b8 0%,#fff9e9 4%,#fffdf4 49%,#f0e3cc 50%,#fffdf4 52%,#fff9e9 96%,#e8d4b6 100%);border:1px solid #d9bca0;border-radius:12px 28px 28px 12px;box-shadow:inset 8px 0 13px #9e78541f,inset -9px 0 13px #9e78541c,5px 8px 0 #d1b598;padding:clamp(22px,5vw,55px)}
@@ -410,17 +421,59 @@ def draw_scene(page_number=0):
     b=io.BytesIO();im.save(b,format="PNG");return b.getvalue()
 
 
+def generate_story_illustration():
+    """Optional Gemini image generation; do not substitute irrelevant geometric art."""
+    from google import genai
+    from google.genai import types
+    key, _ = get_key_model()
+    if not key:
+        raise RuntimeError("Gemini API 키가 없습니다.")
+    story = ss.story or {}
+    excerpt = " ".join(story.get("pages", []))[:2200]
+    language = "Korean" if ss.lang == "한국어" else "English"
+    prompt = (
+        "Create ONE beautiful collectible children's picture-book illustration, "
+        "warm hand-painted watercolor and gouache, professional editorial quality, "
+        "distinctive expressive characters, meaningful environment, cinematic storytelling, "
+        "gentle pastel palette, no letters, no text, no words, no watermark. "
+        "Depict the MOST IMPORTANT SPECIFIC scene in this story. "
+        "Do not use generic circles, abstract triangles, default castles or unrelated mascots. "
+        f"Story title: {story.get('title','')}. Story language: {language}. "
+        f"Characters: {ss.hero}. Setting: {ss.place}. "
+        f"Full story: {excerpt}"
+    )
+    model = os.getenv("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image")
+    try:
+        model = st.secrets.get("GEMINI_IMAGE_MODEL") or model
+    except Exception:
+        pass
+    with genai.Client(api_key=key) as client:
+        response = client.models.generate_content(
+            model=model, contents=prompt,
+            config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"])
+        )
+    for candidate in response.candidates or []:
+        for part in candidate.content.parts or []:
+            inline = getattr(part, "inline_data", None)
+            if inline is not None and getattr(inline, "data", None):
+                return bytes(inline.data), getattr(inline, "mime_type", "image/png")
+    raise RuntimeError("이미지 응답을 받지 못했습니다. 모델 또는 이미지 생성 권한을 확인해 주세요.")
+
+
 def book_markup():
-    """Identical storybook structure for Streamlit and downloaded HTML."""
     title = html.escape(ss.story["title"])
     paragraphs = "".join(f"<p>{html.escape(para)}</p>" for para in ss.story["pages"])
-    picture = base64.b64encode(draw_scene(0)).decode("ascii")
-    alt = tr("이야기 소재와 등장인물에 맞춰 그린 삽화", "Illustration based on the story")
-    return (f'<div class="picturebook-wrap"><article class="picturebook">'
-            f'<h2>{title}</h2><div class="book-ornament">✦ ── ✧ ── ✦</div>'
-            f'<img class="scene-window" alt="{alt}" src="data:image/png;base64,{picture}">'
-            f'<div class="book-prose">{paragraphs}</div>'
-            f'<div class="book-end">✦ ✧ ✦</div></article></div>')
+    image_data = ss.get("story_illustration")
+    illustration = ""
+    if image_data:
+        picture = base64.b64encode(image_data).decode("ascii")
+        mime = ss.get("story_illustration_mime", "image/png")
+        illustration = f'<img class="keepsake-illustration" alt="Story illustration" src="data:{mime};base64,{picture}">'
+    return (f'<div class="keepsake-shell"><article class="keepsake-book">'
+            f'<div class="keepsake-label">✦ MY LITTLE STORYBOOK ✦</div>'
+            f'<h2>{title}</h2><div class="keepsake-ornament">✧ ── ✦ ── ✧</div>'
+            f'{illustration}<div class="keepsake-text">{paragraphs}</div>'
+            f'<div class="keepsake-end">✦ THE END ✦</div></article></div>')
 
 
 def html_book():
@@ -430,8 +483,8 @@ def html_book():
             f'<meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>{title}</title><style>{book_css}'
             f'body{{max-width:950px;margin:30px auto;padding:12px;background:#fff7f0}}'
-            f'@media print{{.picturebook-wrap{{box-shadow:none;padding:0}}'
-            f'.picturebook{{box-shadow:none}}}}</style></head>'
+            f'@media print{{.keepsake-shell{{box-shadow:none;padding:0}}'
+            f'.keepsake-book{{box-shadow:none}}}}</style></head>'
             f'<body>{book_markup()}</body></html>')
 
 # The language control is placed in normal document flow, not near the cropped top edge.
@@ -567,12 +620,26 @@ elif ss.stage == 5:
 elif ss.stage == 6:
     st.subheader(tr("📖 짜잔! 나만의 동화책이 완성됐어", "📖 Ta-da! Your storybook is ready!"))
     if ss.notice:st.warning(tr(ss.notice, "AI is unavailable, so example choices are shown. Please check the adult connection settings."))
+    if not ss.get("story_illustration"):
+        st.info(tr("📖 이야기 속 장면을 그림으로 만들면 나만의 소장용 그림책이 완성돼요. (Gemini 이미지 생성 기능이 지원되는 API 키가 필요해요.)",
+                   "📖 Create a matching illustration for a keepsake storybook. (Your Gemini API key must support image generation.)"))
+        if st.button(tr("🎨 내 이야기 그림 그리기", "🎨 Illustrate my story"), type="primary", use_container_width=True):
+            with st.spinner(tr("이야기에 어울리는 장면을 그리고 있어요...", "Painting your story scene...")):
+                try:
+                    data, mime = generate_story_illustration()
+                    ss.story_illustration = data
+                    ss.story_illustration_mime = mime
+                    st.rerun()
+                except Exception as error:
+                    st.warning(tr("삽화를 생성하지 못했어요. 이미지 생성 모델 사용 권한이나 할당량을 확인해 주세요.",
+                                  "Illustration unavailable. Check image model access and quota."))
+                    st.caption(f"{type(error).__name__} · HTTP {getattr(error,'code','—')}")
     st.markdown(book_markup(), unsafe_allow_html=True)
     st.caption(tr(ss.story.get("ending_note",""), "The ending has been polished to fit the story."))
     with st.expander(tr("✏️ 내가 처음 쓴 결말 보기", "✏️ See my original ending")):
         st.write(ss.ending)
     st.download_button(tr("📥 한 페이지 동화 다운로드 (.html)", "📥 Download one-page story (.html)"),data=html_book().encode("utf-8"),file_name=f"marshmallow_story_{datetime.now():%Y%m%d}.html",mime="text/html",use_container_width=True)
-    st.caption(tr("삽화는 이야기 속 장소·등장인물·사건에 맞춰 그린 장식 그림이에요. AI가 장면 전체를 직접 그리는 방식은 아니에요.", "The decorative illustration responds to your story setting and events; it is not a full AI-rendered scene."))
+    st.caption(tr("그림이 생성되면 다운로드하는 동화책에도 함께 들어가요.", "Generated art is included in your downloaded storybook."))
     st.markdown("---")
     st.caption(tr("완성한 이야기를 더 이어갈까, 새로운 이야기를 시작할까?", "Continue this story or begin a new one?"))
     left, right = st.columns(2)
@@ -585,11 +652,13 @@ elif ss.stage == 6:
             ss.ending = ""
             ss.title = ""
             ss.story = None
+            ss.pop("story_illustration", None)
+            ss.pop("story_illustration_mime", None)
             ss.notice = ""
             ss.options = options_for("event")
             go(4)
     with right:
         if st.button(tr("🍡 다른 이야기 만들기", "🍡 Make a different story"),use_container_width=True):
-            for key in ("stage","topic","sauce","genre","hero","place","events","ending","title","options","notice","story","ai_model","ai_error","continuation_start","previous_story_text","continuation_count"):
+            for key in ("stage","topic","sauce","genre","hero","place","events","ending","title","options","notice","story","ai_model","ai_error","continuation_start","previous_story_text","continuation_count","story_illustration","story_illustration_mime"):
                 ss.pop(key,None)
             st.rerun()
