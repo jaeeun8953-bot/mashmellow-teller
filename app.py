@@ -30,6 +30,25 @@ def init():
 init()
 
 
+def friendly_ai_error(error):
+    """Show a useful diagnosis without revealing API keys or prompts."""
+    name = type(error).__name__
+    code = getattr(error, "code", None)
+    status = str(getattr(error, "status", "") or "").upper()
+    msg = str(error).lower()
+    if "missing api key" in msg:
+        return "API 키를 찾지 못했어요. Streamlit 앱 Settings → Secrets에 GEMINI_API_KEY를 저장해 주세요."
+    if code == 429 or "resource_exhausted" in status or "quota" in msg or "rate limit" in msg:
+        return "Gemini 사용량 한도(429)에 도달했어요. Google AI Studio에서 할당량을 확인하거나 잠시 후 다시 시도해 주세요."
+    if code in (401, 403) or "permission_denied" in status or "api key not valid" in msg:
+        return "API 키 인증 또는 권한 오류(401/403)예요. 키가 유효한지, Gemini API 사용이 가능한지 확인해 주세요."
+    if code == 404 or "not_found" in status or "model" in msg and "not found" in msg:
+        return "Gemini 모델을 찾지 못했어요(404). Secrets의 GEMINI_MODEL을 확인하거나 삭제해 기본 모델을 사용해 주세요."
+    if isinstance(error, (json.JSONDecodeError, ValueError, KeyError)):
+        return "Gemini가 선택지를 지정된 형식으로 보내지 않았어요. 다시 시도해 주세요."
+    return f"Gemini 요청 실패: {name}" + (f" (HTTP {code})" if code else "") + ". 앱 로그에서 오류 종류를 확인해 주세요."
+
+
 def ai_options(kind, count=4):
     ss=st.session_state
     context={"소재":ss.topic,"소스":ss.sauce,"소스 설명":SAUCES[ss.sauce],"등장인물":ss.character,"장소":ss.place,"이미 선택한 사건":ss.events}
@@ -60,7 +79,8 @@ def ai_options(kind, count=4):
         ss.warning=""
         return options
     except Exception as e:
-        ss.warning="AI 연결이 없어 예시 선택지를 보여주고 있어요. GitHub/Streamlit Secrets의 GEMINI_API_KEY를 확인해 주세요."
+        ss.warning="⚠️ " + friendly_ai_error(e) + " 지금은 예시 선택지를 보여주고 있어요."
+        print("Marshmallow Gemini error:", type(e).__name__, "HTTP:", getattr(e, "code", None), "status:", getattr(e, "status", None))
         if kind=="character": return CHARACTERS
         if kind=="place": return PLACES
         # Even without AI, connect events to the current character/place/topic and avoid identical repeat options.
@@ -74,95 +94,3 @@ def ai_options(kind, count=4):
         # Rotate using number of selected events to avoid always identical options.
         shift=len(ss.events)*3 % len(pool)
         return (pool[shift:]+pool[:shift])[:4]
-
-
-def go(stage):
-    st.session_state.stage=stage
-    st.rerun()
-
-
-def make_story():
-    ss=st.session_state
-    char=ss.character.split(" ",1)[-1]
-    place=ss.place.split(" ",1)[-1]
-    intro=f"옛날 옛적, {ss.topic}에 관심이 많은 {char}가 있었어요. 어느 날 {char}는 {place}에 가게 되었지요."
-    paragraphs=[intro]
-    for i,event in enumerate(ss.events):
-        lead=["그때", "잠시 뒤", "그러던 어느 순간", "조금 후"][i%4]
-        paragraphs.append(f"{lead}, {event.rstrip(' .')}.")
-    paragraphs.append(ss.ending.strip())
-    return "\n\n".join(paragraphs)
-
-st.markdown('<div class="hero"><div style="font-size:3.8rem">🍡</div><h1>마시멜로</h1><b>말랑말랑, 나만의 스토리텔링 수업</b><p>상상 한 스푼, 이야기가 몽글몽글!</p></div>',unsafe_allow_html=True)
-ss=st.session_state
-steps=["소재와 소스","과자 친구","이야기 장소","사건 만들기","나만의 결말","동화책 완성"]
-st.progress(ss.stage/5)
-st.caption(f"{min(ss.stage+1,6)} / 6 · {steps[ss.stage]}")
-
-if ss.stage==0:
-    st.subheader("🍡 어떤 이야기를 만들어 볼까?")
-    st.text_input("이야기 소재",key="topic",placeholder="예: 바다, 공룡, 학교, 별")
-    st.markdown("#### 소스를 골라 줘!")
-    st.radio("이야기 맛",list(SAUCES),key="sauce",horizontal=True)
-    st.info(SAUCES[ss.sauce])
-    st.caption("이름, 학교, 주소, 전화번호 같은 개인정보는 적지 말아 줘.")
-    if st.button("🍪 과자 친구 만나러 가기",type="primary",use_container_width=True,disabled=not ss.topic.strip()):
-        ss.options=ai_options("character");go(1)
-
-elif ss.stage==1:
-    st.subheader("🍪 어떤 과자 친구와 떠날까?")
-    st.caption(f"소재: {ss.topic} · 소스: {ss.sauce}")
-    if ss.warning: st.caption(ss.warning)
-    for i,opt in enumerate(ss.options):
-        if st.button(opt,key=f"character_{i}",use_container_width=True):
-            ss.character=opt;ss.options=ai_options("place");go(2)
-    if st.button("← 소스 다시 고르기"):go(0)
-
-elif ss.stage==2:
-    st.subheader("🏝️ 이야기는 어디서 시작할까?")
-    st.caption(f"주인공: {ss.character}")
-    if ss.warning:st.caption(ss.warning)
-    for i,opt in enumerate(ss.options):
-        if st.button(opt,key=f"place_{i}",use_container_width=True):
-            ss.place=opt;ss.events=[];ss.options=ai_options("event");go(3)
-    if st.button("← 등장인물 다시 고르기"):
-        ss.options=ai_options("character");go(1)
-
-elif ss.stage==3:
-    st.subheader("✨ 다음엔 어떤 일이 일어날까?")
-    st.caption(f"{ss.character} · {ss.place}")
-    if ss.events:
-        st.markdown("**지금까지의 이야기**")
-        for i,event in enumerate(ss.events,1):st.write(f"{i}. {event}")
-    if ss.warning:st.caption(ss.warning)
-    for i,opt in enumerate(ss.options):
-        if st.button(f"☁️ {opt}",key=f"event_{len(ss.events)}_{i}",use_container_width=True):
-            ss.events.append(opt)
-            if len(ss.events)>=3:go(4)
-            ss.options=ai_options("event");st.rerun()
-    if ss.events and st.button("✏️ 이제 내가 결말을 쓸래!",type="primary",use_container_width=True):go(4)
-    if st.button("← 장소 다시 고르기"):
-        ss.options=ai_options("place");go(2)
-
-elif ss.stage==4:
-    st.subheader("✏️ 마지막 장면은 내가 만들어요")
-    st.caption("어떤 결말이든 좋아! 한 문장만 적어도 괜찮아.")
-    st.markdown("**지금까지 일어난 일**")
-    st.write(f"{ss.character}가 {ss.place}에서 이야기를 시작했어요.")
-    for event in ss.events:st.write(f"☁️ {event}")
-    st.text_area("나만의 결말",key="ending",height=160,placeholder="그래서 주인공은 어떻게 되었을까?")
-    st.text_input("동화책 제목 (선택)",key="title",placeholder=f"{ss.topic}의 비밀")
-    if st.button("📖 내 동화책 완성하기",type="primary",use_container_width=True,disabled=not ss.ending.strip()):go(5)
-    if st.button("← 이야기 더 만들기"):
-        ss.options=ai_options("event");go(3)
-
-elif ss.stage==5:
-    title=ss.title.strip() or f"{ss.topic}의 특별한 이야기"
-    story=make_story()
-    st.markdown(f"## 📖 {title}")
-    st.markdown(f'<div class="book">{("<p>"+"</p><p>".join(__import__("html").escape(x) for x in story.split(chr(10)+chr(10)))+"</p>")}</div>',unsafe_allow_html=True)
-    st.caption("마지막 문단은 내가 직접 쓴 결말이에요 💗")
-    st.download_button("📥 내 동화책 저장 (.txt)",data=f"{title}\n\n{story}",file_name=f"marshmallow_story_{datetime.now():%Y%m%d}.txt",mime="text/plain",use_container_width=True)
-    if st.button("🍡 새로운 이야기 만들기",type="primary",use_container_width=True):
-        for k in ["stage","topic","sauce","character","place","events","ending","title","options","warning"]:ss.pop(k,None)
-        st.rerun()
