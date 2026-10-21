@@ -447,6 +447,7 @@ def generate_story_illustration():
         model = st.secrets.get("GEMINI_IMAGE_MODEL") or model
     except Exception:
         pass
+    # Keep the client open through the entire request, and return image bytes only.
     with genai.Client(api_key=key) as client:
         response = client.models.generate_content(
             model=model, contents=prompt,
@@ -633,7 +634,17 @@ elif ss.stage == 6:
                 except Exception as error:
                     st.warning(tr("삽화를 생성하지 못했어요. 이미지 생성 모델 사용 권한이나 할당량을 확인해 주세요.",
                                   "Illustration unavailable. Check image model access and quota."))
-                    st.caption(f"{type(error).__name__} · HTTP {getattr(error,'code','—')}")
+                    code = getattr(error, "code", None)
+                    detail = str(error)
+                    # Never reveal credentials even if an SDK exception includes them.
+                    key, _ = get_key_model()
+                    if key:
+                        detail = detail.replace(key, "[API KEY HIDDEN]")
+                    with st.expander(tr("🔎 그림 생성 오류 자세히 보기", "🔎 Image error details"), expanded=True):
+                        st.code(f"{type(error).__name__} / HTTP {code or '—'}\n{detail[:1800]}")
+                        st.caption(tr("404: 모델 이름 또는 접근 권한 확인 · 429: 사용량 한도 확인 · 403: API 권한 또는 결제 설정 확인", "404: model/access · 429: quota · 403: permissions/billing"))
+    if ss.get("story_illustration"):
+        st.image(ss.story_illustration, caption=tr("내 이야기 속 한 장면", "A scene from my story"), use_container_width=True)
     st.markdown(book_markup(), unsafe_allow_html=True)
     st.caption(tr(ss.story.get("ending_note",""), "The ending has been polished to fit the story."))
     with st.expander(tr("✏️ 내가 처음 쓴 결말 보기", "✏️ See my original ending")):
