@@ -35,7 +35,12 @@ CSS = """
 .stApp{background:linear-gradient(145deg,#fff4ed 0%,#fff9f3 48%,#f8f0ff 100%)}
 .block-container{max-width:1100px;padding-top:4rem;padding-bottom:5rem}
 h1,h2,h3{color:#71433e;letter-spacing:-.025em}
-div.stButton>button{border-radius:20px;min-height:3.25rem;height:auto;white-space:normal;background:#fffefa;color:#6b4943;border:1px solid #f1cfc5;padding:12px 14px}
+div.stButton>button{border-radius:20px;min-height:3.7rem;height:auto;white-space:normal;background:#fffefa;color:#6b4943;border:1px solid #f1cfc5;padding:15px 18px;font-size:1.12rem;font-weight:750;line-height:1.5;letter-spacing:-.015em}
+/* Ensure text in all Streamlit buttons, including option cards, is legible. */
+div.stButton>button p,div.stButton>button span,div.stButton>button [data-testid="stMarkdownContainer"]{font-size:inherit!important;font-weight:750!important;line-height:1.5!important}
+div.stDownloadButton>button{border-radius:20px;min-height:3.7rem;padding:15px 18px;font-size:1.12rem;font-weight:750;line-height:1.5}
+div.stDownloadButton>button p,div.stDownloadButton>button span{font-size:inherit!important;font-weight:750!important}
+@media(max-width:600px){div.stButton>button,div.stDownloadButton>button{font-size:1.04rem;min-height:3.5rem;padding:13px 12px}}
 div.stButton>button:hover{background:#fff0e9;border-color:#e79e9e;color:#70423b}
 div.stButton>button[kind="primary"]{background:#e68f9b;color:white;border-color:#e68f9b}
 .oven-title{text-align:center;color:#743e36;font-size:clamp(1.55rem,4vw,2.8rem);font-weight:850;line-height:1.35;overflow-wrap:break-word;padding:0 8px}
